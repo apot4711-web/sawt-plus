@@ -786,8 +786,6 @@ Commands:
   gain 1.5x           Set input level (0..8, or 0%..800%)
   mute [on|off]       Mute or unmute the microphone (default: toggle)
   adb <cmd>           ADB fallback: devices, pair, connect, disconnect, run, install
-  build               Build the Android APK (debug, or release with SAWT_PROFILE=release)
-  install [APK]       Install the Android APK over ADB
   version             Print the version
   help                Show this help
 
@@ -795,7 +793,6 @@ Most commands start the headless daemon automatically if it is not running.
 The daemon log is at ~/.config/sawt-plus/daemon.log.
 
 Environment:
-  SAWT_PROFILE              debug (default) or release
   SAWT_NO_AUTOSTART         set to 1 to require an explicit daemon
   ANDROID_SERIAL            ADB serial for the fallback path
 `)

@@ -27,6 +27,8 @@
 - Go client/daemon: `cmd/`, `internal/`
 - Android app: `app/src/main/java/com/sawtplus/app/`
 - App id: `com.sawtplus.app`
+- Ready artifacts: `apk/sawt-plus-2.0.0.apk` and `bin/sawt-linux-amd64`.
+  Users install these; do not put Android build instructions in README.
 - Protocol: WebSocket text control + binary `s16le` 48000 Hz mono 20 ms.
 - Default transport: Wi-Fi (local network, `ws://`); ADB is the fallback.
 - UX: terminal-first CLI. Do NOT build a TUI. The GUI is an optional web page
