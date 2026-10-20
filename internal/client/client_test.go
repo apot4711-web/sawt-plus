@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/apot4711/sawt-plus/internal/daemon"
+	"github.com/apot4711-web/sawt-plus/internal/daemon"
 )
 
 func TestStatus(t *testing.T) {

@@ -17,9 +17,9 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/gorilla/websocket"
 
-	"github.com/apot4711/sawt-plus/internal/config"
-	"github.com/apot4711/sawt-plus/internal/daemon"
-	"github.com/apot4711/sawt-plus/internal/web"
+	"github.com/apot4711-web/sawt-plus/internal/config"
+	"github.com/apot4711-web/sawt-plus/internal/daemon"
+	"github.com/apot4711-web/sawt-plus/internal/web"
 )
 
 type Server struct {

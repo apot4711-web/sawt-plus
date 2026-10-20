@@ -10,8 +10,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/apot4711/sawt-plus/internal/config"
-	"github.com/apot4711/sawt-plus/internal/protocol"
+	"github.com/apot4711-web/sawt-plus/internal/config"
+	"github.com/apot4711-web/sawt-plus/internal/protocol"
 )
 
 type fakeSource struct {

@@ -18,12 +18,12 @@ import (
 
 	"github.com/charmbracelet/log"
 
-	"github.com/apot4711/sawt-plus/internal/adb"
-	"github.com/apot4711/sawt-plus/internal/api"
-	"github.com/apot4711/sawt-plus/internal/client"
-	"github.com/apot4711/sawt-plus/internal/config"
-	"github.com/apot4711/sawt-plus/internal/daemon"
-	"github.com/apot4711/sawt-plus/internal/version"
+	"github.com/apot4711-web/sawt-plus/internal/adb"
+	"github.com/apot4711-web/sawt-plus/internal/api"
+	"github.com/apot4711-web/sawt-plus/internal/client"
+	"github.com/apot4711-web/sawt-plus/internal/config"
+	"github.com/apot4711-web/sawt-plus/internal/daemon"
+	"github.com/apot4711-web/sawt-plus/internal/version"
 )
 
 const androidPkg = "com.sawtplus.app"

@@ -17,12 +17,12 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/apot4711/sawt-plus/internal/adb"
-	"github.com/apot4711/sawt-plus/internal/audio"
-	"github.com/apot4711/sawt-plus/internal/config"
-	"github.com/apot4711/sawt-plus/internal/discovery"
-	"github.com/apot4711/sawt-plus/internal/protocol"
-	"github.com/apot4711/sawt-plus/internal/version"
+	"github.com/apot4711-web/sawt-plus/internal/adb"
+	"github.com/apot4711-web/sawt-plus/internal/audio"
+	"github.com/apot4711-web/sawt-plus/internal/config"
+	"github.com/apot4711-web/sawt-plus/internal/discovery"
+	"github.com/apot4711-web/sawt-plus/internal/protocol"
+	"github.com/apot4711-web/sawt-plus/internal/version"
 )
 
 // audioSource is the subset of audio.Source used by the daemon. It is an

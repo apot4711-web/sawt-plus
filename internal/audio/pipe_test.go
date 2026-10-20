@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/apot4711/sawt-plus/internal/config"
+	"github.com/apot4711-web/sawt-plus/internal/config"
 )
 
 func TestPipeSourceRoundTrip(t *testing.T) {

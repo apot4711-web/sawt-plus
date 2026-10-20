@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/apot4711/sawt-plus/internal/config"
-	"github.com/apot4711/sawt-plus/internal/daemon"
-	"github.com/apot4711/sawt-plus/internal/discovery"
+	"github.com/apot4711-web/sawt-plus/internal/config"
+	"github.com/apot4711-web/sawt-plus/internal/daemon"
+	"github.com/apot4711-web/sawt-plus/internal/discovery"
 )
 
 type Client struct {

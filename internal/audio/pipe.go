@@ -18,7 +18,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/apot4711/sawt-plus/internal/config"
+	"github.com/apot4711-web/sawt-plus/internal/config"
 )
 
 type Source struct {

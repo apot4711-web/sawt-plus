@@ -1,4 +1,4 @@
-module github.com/apot4711/sawt-plus
+module github.com/apot4711-web/sawt-plus
 
 go 1.26.0
 
