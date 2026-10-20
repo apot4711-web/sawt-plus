@@ -1,0 +1,1348 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Sawt+</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --primary: #6750a4;
+      --on-primary: #ffffff;
+      --primary-container: #eadcff;
+      --on-primary-container: #21005d;
+      --secondary-container: #e8def8;
+      --on-secondary-container: #1d192b;
+      --surface: #fef7ff;
+      --surface-1: #f7f2fa;
+      --surface-2: #f3edf7;
+      --surface-3: #ece6f0;
+      --surface-4: #e6e0e9;
+      --inverse-surface: #322f35;
+      --inverse-on-surface: #f5eff7;
+      --on-surface: #1d1b20;
+      --on-surface-variant: #49454f;
+      --outline: #79747e;
+      --outline-variant: #cac4d0;
+      --error: #b3261e;
+      --error-container: #f9dedc;
+      --on-error-container: #410e0b;
+      --ok: #146c2e;
+      --ok-container: #c4eed0;
+      --warn: #7d5700;
+      --warn-container: #ffdfa0;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.05);
+      --radius: 24px;
+      --radius-sm: 16px;
+      --field-bg: var(--surface-2);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --primary: #d0bcff;
+        --on-primary: #381e72;
+        --primary-container: #4f378b;
+        --on-primary-container: #eaddff;
+        --secondary-container: #4a4458;
+        --on-secondary-container: #e8def8;
+        --surface: #141218;
+        --surface-1: #1d1b20;
+        --surface-2: #211f26;
+        --surface-3: #2b2930;
+        --surface-4: #36343b;
+        --inverse-surface: #e6e0e9;
+        --inverse-on-surface: #322f35;
+        --on-surface: #e6e0e9;
+        --on-surface-variant: #cac4d0;
+        --outline: #938f99;
+        --outline-variant: #49454f;
+        --error: #f2b8b5;
+        --error-container: #8c1d18;
+        --on-error-container: #f9dedc;
+        --ok: #6dd58c;
+        --ok-container: #0a3d1b;
+        --warn: #ffb951;
+        --warn-container: #3f2d00;
+        --shadow: none;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif;
+      background: var(--surface);
+      color: var(--on-surface);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+    }
+    button, input { font: inherit; color: inherit; }
+    h1, h2, h3, p { margin: 0; }
+
+    .app-bar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 64px;
+      padding: 8px clamp(16px, 4vw, 40px);
+      background: var(--surface);
+      box-shadow: 0 1px 0 var(--outline-variant);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+    }
+    .brand-icon svg { width: 22px; height: 22px; }
+    .brand h1 { font-size: 17px; font-weight: 600; letter-spacing: 0.01em; }
+    .brand p { font-size: 12px; color: var(--on-surface-variant); }
+    .app-actions { display: flex; align-items: center; gap: 8px; }
+
+    .state-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 32px;
+      padding: 0 12px;
+      border-radius: 8px;
+      background: var(--surface-3);
+      color: var(--on-surface-variant);
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .state-chip::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .state-chip[data-state="streaming"] { background: var(--ok-container); color: var(--ok); }
+    .state-chip[data-state="connecting"],
+    .state-chip[data-state="discovering"] { background: var(--warn-container); color: var(--warn); }
+    .state-chip[data-state="pairing"] { background: var(--primary-container); color: var(--on-primary-container); }
+    .state-chip[data-state="error"] { background: var(--error-container); color: var(--on-error-container); }
+    .state-chip.offline { opacity: 0.6; }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--on-surface-variant);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .icon-btn:hover { background: var(--surface-3); }
+
+    .shell {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: clamp(16px, 3vw, 28px) clamp(16px, 4vw, 40px) 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 18px;
+      border-radius: var(--radius-sm);
+      background: var(--error-container);
+      color: var(--on-error-container);
+      font-size: 14px;
+    }
+    .banner.hidden { display: none; }
+    .banner button {
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .hero, .live-grid { display: grid; gap: 16px; }
+    .hero { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); }
+    .live-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+
+    .card {
+      background: var(--surface-2);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.005em;
+    }
+    .card-sub {
+      font-size: 13px;
+      color: var(--on-surface-variant);
+      margin-top: 2px;
+    }
+
+    .field { position: relative; margin-top: 20px; }
+    .field input {
+      width: 100%;
+      height: 56px;
+      padding: 0 16px;
+      border: 1px solid var(--outline);
+      border-radius: 4px;
+      background: transparent;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .field label {
+      position: absolute;
+      inset-inline-start: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 0 4px;
+      background: var(--field-bg);
+      color: var(--on-surface-variant);
+      font-size: 16px;
+      pointer-events: none;
+      transition: top 0.14s ease, font-size 0.14s ease, color 0.14s ease;
+    }
+    .field input:focus { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+    .field input:focus + label,
+    .field input:not(:placeholder-shown) + label {
+      top: 0;
+      font-size: 12px;
+      color: var(--primary);
+    }
+    .field input::placeholder { color: transparent; }
+    .field .mono { direction: ltr; text-align: start; }
+
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 0 24px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--primary);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter 0.15s, background 0.15s, opacity 0.15s;
+      white-space: nowrap;
+    }
+    .btn:hover { filter: brightness(1.08); }
+    .btn:active { filter: brightness(0.94); }
+    .btn:disabled { opacity: 0.38; cursor: not-allowed; filter: none; }
+    .btn.filled { background: var(--primary); color: var(--on-primary); }
+    .btn.tonal { background: var(--secondary-container); color: var(--on-secondary-container); }
+    .btn.outlined { border-color: var(--outline); color: var(--primary); }
+    .btn.text { padding: 0 12px; }
+    .btn.small { min-height: 36px; padding: 0 16px; font-size: 13px; }
+
+    .hint {
+      margin-top: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--on-surface-variant);
+    }
+        .device-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 300px;
+      overflow: auto;
+      margin: 0 -4px;
+      padding: 0 4px;
+    }
+    .device {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      background: var(--surface-1);
+      color: inherit;
+      text-align: start;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .device:hover { background: var(--surface-3); }
+    .device.selected { border-color: var(--primary); background: var(--primary-container); color: var(--on-primary-container); }
+    .device-icon {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      flex: none;
+      border-radius: 12px;
+      background: var(--secondary-container);
+      color: var(--on-secondary-container);
+    }
+    .device-icon::before {
+      content: "";
+      position: absolute;
+      inset: 9px 11px;
+      border: 2px solid currentColor;
+      border-radius: 4px;
+    }
+    .device-icon::after {
+      content: "";
+      position: absolute;
+      bottom: 11px;
+      left: 50%;
+      width: 4px;
+      height: 1px;
+      transform: translateX(-50%);
+      background: currentColor;
+    }
+    .device-main { flex: 1; min-width: 0; }
+    .device-main b {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .device-main small {
+      display: block;
+      font-size: 12px;
+      color: var(--on-surface-variant);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      direction: ltr;
+      text-align: start;
+      overflow-wrap: anywhere;
+    }
+    .device.selected .device-main small { color: var(--on-primary-container); opacity: 0.75; }
+    .tag {
+      flex: none;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--surface-3);
+      color: var(--on-surface-variant);
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .tag.warn { background: var(--warn-container); color: var(--warn); }
+    .tag.ok { background: var(--ok-container); color: var(--ok); }
+    .chevron {
+      width: 8px;
+      height: 8px;
+      flex: none;
+      border-inline-end: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(-45deg);
+      opacity: 0.6;
+    }
+    html[dir="rtl"] .chevron { transform: rotate(135deg); }
+    .empty {
+      padding: 28px 16px;
+      border: 1px dashed var(--outline-variant);
+      border-radius: var(--radius-sm);
+      text-align: center;
+      color: var(--on-surface-variant);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .level-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .level-head span { font-size: 13px; color: var(--on-surface-variant); }
+    output {
+      font-size: 22px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--primary);
+    }
+    input[type="range"] {
+      width: 100%;
+      height: 36px;
+      margin: 0;
+      accent-color: var(--primary);
+      direction: ltr;
+      cursor: pointer;
+    }
+    .status-line { margin-top: 16px; }
+
+    .status-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .kv {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .kv > div {
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-1);
+      min-width: 0;
+    }
+    .kv span { display: block; font-size: 11px; color: var(--on-surface-variant); margin-bottom: 4px; }
+    .kv strong {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      direction: ltr;
+      text-align: start;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .stats > div {
+      padding: 10px;
+      border-radius: 12px;
+      background: var(--surface-1);
+      text-align: center;
+    }
+    .stats b {
+      display: block;
+      font-size: 17px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .stats span { font-size: 11px; color: var(--on-surface-variant); }
+
+        .logs {
+      margin: 0;
+      min-height: 160px;
+      max-height: 300px;
+      overflow: auto;
+      padding: 14px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-1);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      direction: ltr;
+      text-align: start;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .log-line { display: block; }
+    .log-line .t { color: var(--on-surface-variant); opacity: 0.7; }
+    .log-line .l { display: inline-block; min-width: 46px; font-weight: 700; }
+    .log-line.info .l { color: var(--primary); }
+    .log-line.warn .l { color: var(--warn); }
+    .log-line.error .l { color: var(--error); }
+
+    .toast {
+      position: fixed;
+      inset-inline: 50%;
+      bottom: 24px;
+      transform: translateX(50%);
+      z-index: 50;
+      max-width: min(560px, calc(100vw - 32px));
+      padding: 14px 18px;
+      border-radius: 8px;
+      background: var(--inverse-surface);
+      color: var(--inverse-on-surface);
+      font-size: 14px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+      transition: opacity 0.18s, transform 0.18s;
+    }
+    .toast.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(50%) translateY(8px);
+    }
+    .toast.error { background: var(--error-container); color: var(--on-error-container); }
+
+    footer {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 clamp(16px, 4vw, 40px) 28px;
+      color: var(--on-surface-variant);
+      font-size: 11px;
+      opacity: 0.8;
+    }
+
+    @media (max-width: 900px) {
+      .hero, .live-grid { grid-template-columns: 1fr; }
+      .status-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      .brand p { display: none; }
+      .kv { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .card { padding: 16px; border-radius: 20px; }
+      .actions .btn { flex: 1; }
+      .state-chip { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; }
+    }
+  </style>
+</head>
+<body>
+<header class="app-bar">
+  <div class="brand">
+    <div class="brand-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <rect x="9" y="3" width="6" height="11" rx="3"></rect>
+        <path d="M5.5 11a6.5 6.5 0 0 0 13 0"></path>
+        <path d="M12 17.5V21"></path>
+      </svg>
+    </div>
+    <div>
+      <h1 dir="ltr">Sawt+</h1>
+      <p data-i18n="tagline">Wireless Android microphone</p>
+    </div>
+  </div>
+  <div class="app-actions">
+    <span id="connBadge" class="state-chip" data-state="idle" data-i18n="state_idle">idle</span>
+    <button id="langBtn" class="btn text small" type="button" aria-label="language">English</button>
+  </div>
+</header>
+
+<main class="shell">
+  <div id="banner" class="banner hidden">
+    <span id="bannerText"></span>
+    <button id="bannerClose" type="button" aria-label="close">×</button>
+  </div>
+
+  <section class="hero">
+    <article class="card">
+      <div class="card-head">
+        <div>
+          <h2 data-i18n="connection">Connection</h2>
+          <p class="card-sub" data-i18n="connectionSub">Pick a nearby device, then pair once.</p>
+        </div>
+      </div>
+
+      <div class="field">
+        <input id="targetInput" class="mono" type="text" autocapitalize="off" spellcheck="false" placeholder=" " />
+        <label for="targetInput" data-i18n="targetAddress">Target address</label>
+      </div>
+
+      <div class="field">
+        <input id="pairCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder=" " />
+        <label for="pairCode" data-i18n="pairCode">6-digit code</label>
+      </div>
+
+      <div class="actions">
+        <button id="connectBtn" class="btn filled" type="button" data-i18n="connect">Connect</button>
+        <button id="disconnectBtn" class="btn outlined" type="button" data-i18n="disconnect">Disconnect</button>
+        <button id="pairBtn" class="btn tonal" type="button" data-i18n="pairConnect">Pair &amp; connect</button>
+        <button id="unpairBtn" class="btn outlined" type="button" data-i18n="unpair">Unpair</button>
+      </div>
+      <p class="hint" data-i18n="pairHint">The 6-digit code is shown in the Android app. Select a device below to fill the address; the first pairing is remembered.</p>
+    </article>
+
+    <article class="card">
+      <div class="card-head">
+        <div>
+          <h2 data-i18n="devices">Devices</h2>
+          <p class="card-sub" data-i18n="devicesSub">Nearby phones and saved devices.</p>
+        </div>
+        <button id="discoverBtn" class="btn tonal small" type="button" data-i18n="discover">Scan network</button>
+      </div>
+      <div id="deviceList" class="device-list"></div>
+    </article>
+  </section>
+
+  <section class="live-grid">
+    <article class="card">
+      <div class="card-head">
+        <div>
+          <h2 data-i18n="audio">Audio</h2>
+          <p class="card-sub" data-i18n="audioSub">Digital level applied on the computer.</p>
+        </div>
+      </div>
+      <div class="level-head">
+        <span data-i18n="gain">Input level</span>
+        <output id="gainOut" for="gainRange">1.00x</output>
+      </div>
+      <input id="gainRange" type="range" min="0" max="8" step="0.05" value="1" />
+      <div class="actions">
+        <button id="muteBtn" class="btn outlined" type="button" data-i18n="mute">Mute</button>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-head">
+        <div>
+          <h2 data-i18n="monitor">Monitor</h2>
+          <p class="card-sub" data-i18n="monitorHint">Play the live audio here. Use headphones to avoid feedback.</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="monitorBtn" class="btn filled" type="button" data-i18n="listen">Listen</button>
+      </div>
+      <p class="hint status-line" id="monitorStatus">—</p>
+    </article>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2 data-i18n="statusTitle">Status</h2>
+    </div>
+    <div class="status-grid">
+      <div class="kv">
+        <div><span data-i18n="device">Device</span><strong id="deviceText">—</strong></div>
+        <div><span data-i18n="address">Address</span><strong id="addressText" class="mono">—</strong></div>
+        <div><span data-i18n="transport">Transport</span><strong id="transportText">—</strong></div>
+        <div><span data-i18n="audioFormat">Audio</span><strong id="formatText">—</strong></div>
+        <div><span data-i18n="uptime">Uptime</span><strong id="uptimeText">—</strong></div>
+      </div>
+      <div class="stats">
+        <div><b id="clientsText">0</b><span data-i18n="clients">clients</span></div>
+        <div><b id="framesText">0</b><span data-i18n="frames">frames</span></div>
+        <div><b id="droppedText">0</b><span data-i18n="dropped">dropped</span></div>
+        <div><b id="rttText">0</b><span data-i18n="rtt">rtt ms</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2 data-i18n="logs">Log</h2>
+      <button id="clearLogs" class="btn text small" type="button" data-i18n="clear">Clear</button>
+    </div>
+    <pre id="logList" class="logs"></pre>
+  </section>
+</main>
+
+<footer>Sawt+ · local control panel · ws://127.0.0.1</footer>
+<div id="toast" class="toast hidden" role="status"></div>
+
+<script>
+const I18N = {
+  ar: {
+    tagline: "ميكروفون أندرويد لاسلكي",
+    statusTitle: "الحالة",
+    device: "الجهاز",
+    address: "العنوان",
+    transport: "النقل",
+    audioFormat: "الصيغة",
+    uptime: "مدة التشغيل",
+    clients: "متصل",
+    frames: "إطار",
+    dropped: "مفقود",
+    rtt: "استجابة ms",
+    connection: "الاتصال",
+    connectionSub: "اختر جهازاً قريباً ثم اقترن مرة واحدة.",
+    target: "الهدف",
+    targetAddress: "عنوان الشبكة أو USB",
+    connect: "اتصال",
+    disconnect: "قطع الاتصال",
+    unpair: "قطع الاقتران",
+    pairing: "الاقتران",
+    pairCode: "الرمز المكوّن من 6 أرقام",
+    pairConnect: "اقترن واتصل",
+    pairHint: "الرمز يظهر في تطبيق الأندرويد. اختر جهازاً من القائمة لملء العنوان، ويُحفظ الاقتران بعد المرة الأولى.",
+    audio: "الصوت",
+    audioSub: "مستوى رقمي يُطبَّق على الحاسوب.",
+    gain: "مستوى الصوت",
+    mute: "كتم",
+    unmute: "إلغاء الكتم",
+    monitor: "الاستماع",
+    monitorHint: "شغّل الصوت مباشرة هنا. استخدم سماعات لتجنب الصدى.",
+    listen: "استماع",
+    stopListening: "إيقاف الاستماع",
+    devices: "الأجهزة",
+    devicesSub: "الهواتف القريبة والأجهزة المحفوظة.",
+    discover: "بحث في الشبكة",
+    searching: "جارٍ البحث…",
+    saved: "محفوظ",
+    nearby: "قريب",
+    connectAction: "اتصال",
+    noDevices: "لا توجد أجهزة بعد. شغّل التطبيق على الجوال واضغط «بحث في الشبكة».",
+    logs: "السجل",
+    clear: "مسح",
+    state_idle: "خامل",
+    state_discovering: "يبحث",
+    state_pairing: "بانتظار الاقتران",
+    state_connecting: "يتصل",
+    state_streaming: "يبث",
+    state_error: "خطأ",
+    transport_wifi: "واي فاي",
+    transport_adb: "ADB",
+    mono: "أحادي",
+    on: "مفعّل",
+    off: "متوقف",
+    none: "—",
+    connecting: "جارٍ الاتصال…",
+    disconnected: "تم قطع الاتصال",
+    unpaired: "تم قطع الاقتران",
+    unpairedNone: "لا يوجد اقتران محفوظ لهذا الجهاز",
+    paired: "تم الاقتران",
+    pairFailed: "فشل الاقتران",
+    connectFailed: "فشل الاتصال",
+    discoverFailed: "فشل البحث",
+    found: "جهاز موجود",
+    muted: "تم الكتم",
+    unmuted: "تم إلغاء الكتم",
+    gainSet: "تم ضبط مستوى الصوت",
+    daemonOffline: "انقطع الاتصال بالخادم. أعد تشغيله بالأمر: sawt daemon",
+    monitorOn: "الاستماع مفعّل",
+    monitorOff: "الاستماع متوقف",
+    monitorUnsupported: "المتصفح لا يدعم تشغيل الصوت",
+    monitorWaiting: "بانتظار وصول الصوت…",
+    needTarget: "أدخل عنوان الجهاز أولاً",
+    needCode: "أدخل رمز الاقتران",
+    copy: "نسخ",
+    close: "إغلاق"
+  },
+  en: {
+    tagline: "Wireless Android microphone",
+    statusTitle: "Status",
+    device: "Device",
+    address: "Address",
+    transport: "Transport",
+    audioFormat: "Audio",
+    uptime: "Uptime",
+    clients: "clients",
+    frames: "frames",
+    dropped: "dropped",
+    rtt: "rtt ms",
+    connection: "Connection",
+    connectionSub: "Pick a nearby device, then pair once.",
+    target: "Target",
+    targetAddress: "Network or USB address",
+    connect: "Connect",
+    disconnect: "Disconnect",
+    unpair: "Unpair",
+    pairing: "Pairing",
+    pairCode: "6-digit code",
+    pairConnect: "Pair & connect",
+    pairHint: "The 6-digit code is shown in the Android app. Select a device below to fill the address; the first pairing is remembered.",
+    audio: "Audio",
+    audioSub: "Digital level applied on the computer.",
+    gain: "Input level",
+    mute: "Mute",
+    unmute: "Unmute",
+    monitor: "Monitor",
+    monitorHint: "Play the live audio here. Use headphones to avoid feedback.",
+    listen: "Listen",
+    stopListening: "Stop listening",
+    devices: "Devices",
+    devicesSub: "Nearby phones and saved devices.",
+    discover: "Scan network",
+    searching: "Searching…",
+    saved: "saved",
+    nearby: "nearby",
+    connectAction: "Connect",
+    noDevices: "No devices yet. Start the phone app and tap “Scan network”.",
+    logs: "Log",
+    clear: "Clear",
+    state_idle: "idle",
+    state_discovering: "discovering",
+    state_pairing: "pairing required",
+    state_connecting: "connecting",
+    state_streaming: "streaming",
+    state_error: "error",
+    transport_wifi: "Wi-Fi",
+    transport_adb: "ADB",
+    mono: "mono",
+    on: "on",
+    off: "off",
+    none: "—",
+    connecting: "Connecting…",
+    disconnected: "Disconnected",
+    unpaired: "Unpaired",
+    unpairedNone: "No saved pairing for this device",
+    paired: "Paired",
+    pairFailed: "Pairing failed",
+    connectFailed: "Connection failed",
+    discoverFailed: "Discovery failed",
+    found: "device found",
+    muted: "Muted",
+    unmuted: "Unmuted",
+    gainSet: "Input level updated",
+    daemonOffline: "Lost contact with the daemon. Restart it with: sawt daemon",
+    monitorOn: "Monitor on",
+    monitorOff: "Monitor off",
+    monitorUnsupported: "This browser cannot play audio",
+    monitorWaiting: "Waiting for audio…",
+    needTarget: "Enter a device address first",
+    needCode: "Enter the pairing code",
+    copy: "Copy",
+    close: "Close"
+  }
+};
+
+const $ = (id) => document.getElementById(id);
+const urlLang = new URLSearchParams(location.search).get("lang");
+const storedLang = urlLang || localStorage.getItem("sawtplus-lang");
+let lang = storedLang || ((navigator.language || "").startsWith("ar") ? "ar" : "en");
+if (!I18N[lang]) lang = "en";
+if (urlLang && I18N[urlLang]) localStorage.setItem("sawtplus-lang", urlLang);
+const t = (key) => (I18N[lang] && I18N[lang][key]) || (I18N.en && I18N.en[key]) || key;
+
+const ui = {
+  status: null,
+  discovered: [],
+  saved: [],
+  logs: [],
+  monitor: { ws: null, ctx: null, next: 0 },
+  toastTimer: null,
+  lastUptime: 0,
+  uptimeTimer: null,
+  selected: null
+};
+
+function applyLanguage() {
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  $("langBtn").textContent = lang === "ar" ? "English" : "العربية";
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  if (ui.status) renderStatus(ui.status);
+  renderDevices();
+  renderLogs();
+  renderMonitor();
+}
+
+function toast(message, kind) {
+  const el = $("toast");
+  el.textContent = message;
+  el.className = "toast" + (kind === "error" ? " error" : "");
+  clearTimeout(ui.toastTimer);
+  ui.toastTimer = setTimeout(() => el.classList.add("hidden"), 3600);
+}
+
+function showBanner(message) {
+  const el = $("banner");
+  if (!message) {
+    el.classList.add("hidden");
+    return;
+  }
+  $("bannerText").textContent = message;
+  el.classList.remove("hidden");
+}
+
+async function api(path, method = "GET", body) {
+  const options = { method, headers: {} };
+  if (body !== undefined) {
+    options.headers["Content-Type"] = "application/json";
+    options.body = JSON.stringify(body);
+  }
+  const res = await fetch(path, options);
+  let data = {};
+  try { data = await res.json(); } catch (_) {}
+  if (!res.ok) {
+    throw new Error(data.error || ("HTTP " + res.status));
+  }
+  return data;
+}
+
+function stateLabel(state) {
+  return t("state_" + state) || state || t("none");
+}
+
+function transportLabel(transport) {
+  if (!transport) return t("none");
+  const key = "transport_" + String(transport).toLowerCase();
+  return I18N[lang][key] || transport;
+}
+
+function formatUptime(since) {
+  if (!since) return t("none");
+  const started = new Date(since).getTime();
+  if (!Number.isFinite(started)) return t("none");
+  const seconds = Math.max(0, Math.floor((Date.now() - started) / 1000));
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return h + "h " + String(m).padStart(2, "0") + "m";
+  return m + "m " + String(s).padStart(2, "0") + "s";
+}
+
+function setTarget(address, name) {
+  ui.selected = address ? { address, name: name || address } : null;
+  $("targetInput").value = address || "";
+  renderDevices();
+}
+
+function renderStatus(st) {
+  ui.status = st;
+  const badge = $("connBadge");
+  badge.dataset.state = st.state || "idle";
+  badge.textContent = stateLabel(st.state);
+
+  $("deviceText").textContent = st.device || t("none");
+  $("addressText").textContent = st.address || t("none");
+  $("transportText").textContent = transportLabel(st.transport);
+  const channels = st.channels === 1 ? t("mono") : (st.channels || 0) + " ch";
+  $("formatText").textContent = st.rate
+    ? (st.rate / 1000) + " kHz · " + channels + " · " + st.frame_ms + " ms"
+    : t("none");
+  $("uptimeText").textContent = formatUptime(st.since);
+  ui.lastUptime = Date.now();
+
+  $("clientsText").textContent = st.clients || 0;
+  $("framesText").textContent = Number(st.frames || 0).toLocaleString(lang);
+  $("droppedText").textContent = Number(st.dropped || 0).toLocaleString(lang);
+  $("rttText").textContent = st.rtt_ms || 0;
+
+  if (!ui.selected && st.address) {
+    setTarget(st.address, st.device);
+  }
+  if (document.activeElement !== $("gainRange")) {
+    $("gainRange").value = st.gain != null ? st.gain : 1;
+  }
+  $("gainOut").textContent = Number($("gainRange").value).toFixed(2) + "x";
+  $("muteBtn").textContent = st.mute ? t("unmute") : t("mute");
+  $("muteBtn").classList.toggle("filled", !!st.mute);
+  $("muteBtn").classList.toggle("outlined", !st.mute);
+
+  const busy = st.state === "connecting" || st.state === "discovering";
+  $("connectBtn").disabled = busy || st.state === "streaming";
+  $("disconnectBtn").disabled = st.state === "idle" && !st.device;
+
+  if (st.error) showBanner(st.error);
+  else if (!badge.classList.contains("offline")) showBanner("");
+
+  updateUptime();
+}
+
+function updateUptime() {
+  if (ui.status && ui.status.since) {
+    $("uptimeText").textContent = formatUptime(ui.status.since);
+  }
+}
+
+function renderDevices() {
+  const list = $("deviceList");
+  const merged = [];
+  const seen = new Set();
+  ui.saved.forEach((dev) => {
+    merged.push({
+      id: dev.id,
+      name: dev.name || dev.address,
+      address: dev.address,
+      saved: true,
+      pairing: false,
+      transport: "wifi"
+    });
+    seen.add(dev.address);
+  });
+  ui.discovered.forEach((dev) => {
+    if (seen.has(dev.address)) return;
+    merged.push({
+      id: dev.id,
+      name: dev.name || dev.host || dev.address,
+      address: dev.address,
+      saved: false,
+      pairing: !!dev.pairing,
+      transport: dev.transport || "wifi"
+    });
+  });
+
+  const savedSelected = ui.selected && ui.saved.some((dev) => dev.address === ui.selected.address);
+  $("unpairBtn").disabled = !savedSelected;
+
+  list.replaceChildren();
+  if (!merged.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = t("noDevices");
+    list.append(empty);
+    return;
+  }
+
+  merged.forEach((dev) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "device";
+    if (ui.selected && ui.selected.address === dev.address) row.classList.add("selected");
+
+    const icon = document.createElement("span");
+    icon.className = "device-icon";
+    icon.setAttribute("aria-hidden", "true");
+    row.append(icon);
+
+    const main = document.createElement("div");
+    main.className = "device-main";
+    const name = document.createElement("b");
+    name.textContent = dev.name || t("none");
+    const addr = document.createElement("small");
+    addr.textContent = dev.address || "";
+    main.append(name, addr);
+    row.append(main);
+
+    const tag = document.createElement("span");
+    if (dev.transport === "adb") {
+      tag.className = "tag ok";
+      tag.textContent = t("transport_adb");
+    } else if (dev.pairing) {
+      tag.className = "tag warn";
+      tag.textContent = stateLabel("pairing");
+    } else {
+      tag.className = "tag ok";
+      tag.textContent = (dev.saved ? t("saved") + " · " : "") + t("transport_wifi");
+    }
+    row.append(tag);
+
+    const chevron = document.createElement("span");
+    chevron.className = "chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    row.append(chevron);
+
+    row.addEventListener("click", () => {
+      setTarget(dev.address, dev.name);
+      if (dev.transport !== "adb" && dev.pairing) {
+        $("pairCode").focus();
+        return;
+      }
+      doConnect();
+    });
+    list.append(row);
+  });
+}
+
+function renderLogs() {
+  const el = $("logList");
+  const stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+  const frag = document.createDocumentFragment();
+  ui.logs.slice(-250).forEach((entry) => {
+    const line = document.createElement("span");
+    line.className = "log-line " + (entry.level || "info");
+    const time = document.createElement("span");
+    time.className = "t";
+    const date = entry.time ? new Date(entry.time) : new Date();
+    time.textContent = date.toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-GB", { hour12: false }) + " ";
+    const level = document.createElement("span");
+    level.className = "l";
+    level.textContent = String(entry.level || "info").toUpperCase();
+    const message = document.createElement("span");
+    message.textContent = " " + (entry.message || "");
+    line.append(time, level, message);
+    frag.append(line);
+  });
+  el.replaceChildren(frag);
+  if (stick) el.scrollTop = el.scrollHeight;
+}
+
+function addLog(entry) {
+  ui.logs.push(entry);
+  if (ui.logs.length > 400) ui.logs = ui.logs.slice(-400);
+  renderLogs();
+}
+
+function renderMonitor() {
+  const on = !!ui.monitor.ws;
+  $("monitorBtn").textContent = on ? t("stopListening") : t("listen");
+  $("monitorStatus").textContent = on ? t("monitorOn") : t("monitorOff");
+}
+
+async function loadSaved() {
+  try {
+    const data = await api("/api/saved");
+    ui.saved = data.devices || [];
+    renderDevices();
+  } catch (_) {}
+}
+
+async function loadLogs() {
+  try {
+    const logs = await api("/api/logs");
+    ui.logs = Array.isArray(logs) ? logs : [];
+    renderLogs();
+  } catch (_) {}
+}
+
+async function doConnect() {
+  const target = $("targetInput").value.trim();
+  if (!target) {
+    toast(t("needTarget"), "error");
+    $("targetInput").focus();
+    return;
+  }
+  try {
+    $("connectBtn").disabled = true;
+    await api("/api/connect", "POST", { target });
+    toast(t("connecting"));
+  } catch (err) {
+    $("connectBtn").disabled = false;
+    toast(err.message, "error");
+  }
+}
+
+async function doDisconnect() {
+  try {
+    await api("/api/disconnect", "POST", {});
+    toast(t("disconnected"));
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function doUnpair() {
+  const target = $("targetInput").value.trim();
+  if (!target) {
+    toast(t("needTarget"), "error");
+    $("targetInput").focus();
+    return;
+  }
+  $("unpairBtn").disabled = true;
+  try {
+    await api("/api/unpair", "POST", { target });
+    toast(t("unpaired"));
+    $("pairCode").value = "";
+    await loadSaved();
+  } catch (err) {
+    toast(err.message, "error");
+  } finally {
+    renderDevices();
+  }
+}
+
+function parsePairTarget(value) {
+  if (!value.startsWith("sawtplus://")) return null;
+  try {
+    const url = new URL(value);
+    if (url.host !== "pair") return null;
+    const host = url.searchParams.get("host");
+    const port = url.searchParams.get("port") || "8765";
+    const code = url.searchParams.get("code") || "";
+    if (!host) return null;
+    return { target: host + ":" + port, code };
+  } catch (_) {
+    return null;
+  }
+}
+
+async function doPair() {
+  let target = $("targetInput").value.trim();
+  let code = $("pairCode").value.trim();
+  const parsed = parsePairTarget(target);
+  if (parsed) {
+    target = parsed.target;
+    code = code || parsed.code;
+  }
+  if (!target) {
+    toast(t("needTarget"), "error");
+    $("targetInput").focus();
+    return;
+  }
+  if (!code) {
+    toast(t("needCode"), "error");
+    $("pairCode").focus();
+    return;
+  }
+  $("pairBtn").disabled = true;
+  try {
+    const entry = await api("/api/pair", "POST", { target, code });
+    toast(t("paired") + ": " + (entry.name || entry.address));
+    setTarget(entry.address || target, entry.name);
+    $("pairCode").value = "";
+    loadSaved();
+    await api("/api/connect", "POST", { target: entry.address || target });
+  } catch (err) {
+    toast(err.message, "error");
+  } finally {
+    $("pairBtn").disabled = false;
+  }
+}
+
+async function doGain(value) {
+  try {
+    await api("/api/gain", "POST", { gain: value });
+    toast(t("gainSet") + ": " + value.toFixed(2) + "x");
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function doMute() {
+  const next = !(ui.status && ui.status.mute);
+  try {
+    await api("/api/mute", "POST", { mute: next });
+    toast(next ? t("muted") : t("unmuted"));
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function doDiscover() {
+  const button = $("discoverBtn");
+  button.disabled = true;
+  button.textContent = t("searching");
+  try {
+    const data = await api("/api/devices?timeout=3s");
+    const devices = data.devices || [];
+    ui.discovered = devices;
+    if (!ui.selected && devices.length === 1) {
+      const dev = devices[0];
+      setTarget(dev.address, dev.name || dev.host);
+    }
+    renderDevices();
+    if (data.error) toast(data.error, "error");
+    else toast(devices.length + " " + t("found"));
+  } catch (err) {
+    toast(t("discoverFailed") + ": " + err.message, "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = t("discover");
+  }
+}
+
+async function toggleMonitor() {
+  if (ui.monitor.ws) {
+    stopMonitor();
+    return;
+  }
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) {
+    toast(t("monitorUnsupported"), "error");
+    return;
+  }
+  const ctx = new Ctx({ sampleRate: 48000 });
+  await ctx.resume();
+  const scheme = location.protocol === "https:" ? "wss://" : "ws://";
+  const ws = new WebSocket(scheme + location.host + "/api/stream");
+  ws.binaryType = "arraybuffer";
+  ui.monitor = { ws, ctx, next: 0 };
+  ws.onopen = () => {
+    $("monitorStatus").textContent = t("monitorWaiting");
+    renderMonitor();
+  };
+  ws.onmessage = (event) => {
+    if (!(event.data instanceof ArrayBuffer)) return;
+    playFrame(event.data);
+  };
+  ws.onerror = () => toast(t("daemonOffline"), "error");
+  ws.onclose = () => {
+    ui.monitor = { ws: null, ctx: null, next: 0 };
+    renderMonitor();
+  };
+  renderMonitor();
+}
+
+function playFrame(buffer) {
+  if (!ui.monitor.ctx || buffer.byteLength < 2) return;
+  const pcm = new Int16Array(buffer);
+  const floats = new Float32Array(pcm.length);
+  for (let i = 0; i < pcm.length; i++) floats[i] = pcm[i] / 32768;
+  const audioBuffer = ui.monitor.ctx.createBuffer(1, floats.length, 48000);
+  audioBuffer.copyToChannel(floats, 0);
+  const source = ui.monitor.ctx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(ui.monitor.ctx.destination);
+  const now = ui.monitor.ctx.currentTime;
+  if (ui.monitor.next < now || ui.monitor.next > now + 0.5) {
+    ui.monitor.next = now + 0.02;
+  }
+  source.start(ui.monitor.next);
+  ui.monitor.next += floats.length / 48000;
+}
+
+function stopMonitor() {
+  const ws = ui.monitor.ws;
+  const ctx = ui.monitor.ctx;
+  ui.monitor = { ws: null, ctx: null, next: 0 };
+  if (ws) {
+    ws.onclose = null;
+    ws.close();
+  }
+  if (ctx) ctx.close();
+  renderMonitor();
+}
+
+function connectEvents() {
+  const source = new EventSource("/api/events");
+  source.onopen = () => {
+    $("connBadge").classList.remove("offline");
+  };
+  source.onerror = () => {
+    $("connBadge").classList.add("offline");
+    showBanner(t("daemonOffline"));
+  };
+  source.onmessage = (event) => {
+    let data;
+    try { data = JSON.parse(event.data); } catch (_) { return; }
+    if (data.status) renderStatus(data.status);
+    if (data.log) addLog(data.log);
+    if (data.devices) {
+      ui.discovered = data.devices;
+      renderDevices();
+    }
+  };
+}
+
+$("langBtn").addEventListener("click", () => {
+  lang = lang === "ar" ? "en" : "ar";
+  localStorage.setItem("sawtplus-lang", lang);
+  applyLanguage();
+});
+$("bannerClose").addEventListener("click", () => showBanner(""));
+$("connectBtn").addEventListener("click", doConnect);
+$("disconnectBtn").addEventListener("click", doDisconnect);
+$("pairBtn").addEventListener("click", doPair);
+$("unpairBtn").addEventListener("click", doUnpair);
+$("muteBtn").addEventListener("click", doMute);
+$("discoverBtn").addEventListener("click", doDiscover);
+$("monitorBtn").addEventListener("click", toggleMonitor);
+$("clearLogs").addEventListener("click", () => {
+  ui.logs = [];
+  renderLogs();
+});
+$("gainRange").addEventListener("input", () => {
+  $("gainOut").textContent = Number($("gainRange").value).toFixed(2) + "x";
+});
+$("gainRange").addEventListener("change", () => {
+  doGain(Number($("gainRange").value));
+});
+$("targetInput").addEventListener("input", () => {
+  const address = $("targetInput").value.trim();
+  ui.selected = address ? { address, name: address } : null;
+  renderDevices();
+});
+$("targetInput").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") doConnect();
+});
+$("pairCode").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") doPair();
+});
+applyLanguage();
+renderMonitor();
+connectEvents();
+loadSaved();
+loadLogs();
+api("/api/status").then(renderStatus).catch(() => showBanner(t("daemonOffline")));
+ui.uptimeTimer = setInterval(updateUptime, 1000);
+</script>
+</body>
+</html>

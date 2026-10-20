@@ -1,0 +1,85 @@
+<resources>
+    <string name="app_name">صوت+</string>
+    <string name="app_subtitle">ميكروفون أندرويد لاسلكي</string>
+
+    <string name="status_ready_wifi">● جاهز عبر Wi‑Fi</string>
+    <string name="status_adb">● متصل عبر ADB</string>
+    <string name="status_running">● الخدمة تعمل</string>
+    <string name="status_stopped">○ متوقفة</string>
+
+    <string name="pairing_label">رمز الاقتران</string>
+    <string name="pairing_empty">—</string>
+    <string name="pairing_hint">اضغط على العنوان لنسخه · واضغط مطوّلاً على الرمز</string>
+    <string name="code_copied">تم نسخ رمز الاقتران</string>
+    <string name="address_label">عنوان Wi‑Fi</string>
+    <string name="address_copied">تم نسخ العنوان</string>
+    <string name="pairing_valid">متبقٍ %1$d دقيقة · %2$d متصل</string>
+    <string name="clients_connected">%d متصل</string>
+
+    <string name="source_info">المصدر: %1$s · الإطارات %2$d · المفقودة %3$d</string>
+    <string name="source_default">48 كيلوهرتز · أحادي</string>
+
+    <string name="address_unavailable">عنوان Wi‑Fi غير متاح</string>
+    <string name="address_adb">النقل عبر USB/ADB</string>
+
+    <string name="action_start">تشغيل الخدمة</string>
+    <string name="action_stop_service">إيقاف الخدمة</string>
+
+    <string name="transport">النقل</string>
+    <string name="transport_wifi">Wi‑Fi</string>
+    <string name="transport_adb">USB/ADB</string>
+
+    <string name="input_level">مستوى الصوت</string>
+    <string name="mute_title">كتم الميكروفون</string>
+    <string name="mute_subtitle">إرسال صمت مع إبقاء الاتصال</string>
+
+    <string name="battery_settings">إعدادات البطارية</string>
+    <string name="battery_card_title">تحسين البطارية</string>
+    <string name="battery_card_body">اضبط استخدام البطارية على «غير مقيّد» حتى يبقي النظام خدمة الميكروفون تعمل في الخلفية.</string>
+    <string name="battery_card_action">فتح إعدادات البطارية</string>
+
+    <string name="open_menu">فتح القائمة</string>
+    <string name="close_menu">إغلاق القائمة</string>
+
+    <string name="settings">الإعدادات</string>
+    <string name="settings_language">اللغة</string>
+    <string name="settings_theme">الثيم</string>
+    <string name="settings_device_name">اسم الجهاز</string>
+    <string name="device_name_hint">الاسم الذي يظهر للحاسوب</string>
+    <string name="device_name_saved">تم حفظ اسم الجهاز</string>
+    <string name="settings_change">تغيير</string>
+    <string name="language_system">افتراضي النظام</string>
+    <string name="language_english">English</string>
+    <string name="language_arabic">العربية</string>
+    <string name="theme_system">النظام</string>
+    <string name="theme_light">فاتح</string>
+    <string name="theme_dark">داكن</string>
+
+    <string name="about">حول التطبيق</string>
+    <string name="about_version">الإصدار %s</string>
+    <string name="about_body">يحوّل صوت+ هاتفك إلى ميكروفون لاسلكي يبثّ الصوت الحيّ إلى الحاسوب عبر Wi‑Fi، مع USB/ADB كبديل.\n\nمبني على المشروع الأصلي مفتوح المصدر «audiosource» للمطوّر gdzx. صيغة البث: PCM 16 بت، 48 كيلوهرتز، أحادي، إطار كل 20 مللي ثانية.</string>
+
+    <string name="how_to_connect">كيفية الاتصال</string>
+    <string name="how_to_connect_body">١. أبقِ الهاتف على نفس شبكة Wi‑Fi مع الحاسوب.\n٢. على الحاسوب شغّل: sawt discover\n٣. اقترن باستخدام الرمز المكوّن من ٦ أرقام.\n٤. يظهر الهاتف كميكروفون نظام.\n\nلا يزال USB/ADB يعمل كبديل: sawt adb run</string>
+
+    <string name="hint">أبقِ الخدمة تعمل في الخلفية. على Realme/Oppo اضبط استخدام البطارية على «غير مقيّد» حتى لا يوقف النظام خدمة الميكروفون.\n\nأول مرة؟ ثبّت التطبيق مرة واحدة، ثم استخدم Wi‑Fi من عميل الحاسوب (`sawt discover` أو `sawt web`).</string>
+
+    <string name="permission_microphone_required">إذن الميكروفون مطلوب لبث الصوت.</string>
+
+    <string name="notification_starting">جارٍ التشغيل…</string>
+    <string name="notification_waiting">بانتظار اتصال ADB أو Wi‑Fi…</string>
+    <string name="notification_forwarding">بث إلى %s</string>
+    <string name="notification_wifi_status">Wi‑Fi %1$s:%2$d · %3$s</string>
+    <string name="action_stop">إيقاف</string>
+    <string name="channel_name">صوت+</string>
+    <string name="channel_description">بث ميكروفون أندرويد</string>
+
+    <plurals name="notification_clients">
+        <item quantity="zero">لا عملاء</item>
+        <item quantity="one">عميل واحد</item>
+        <item quantity="two">عميلان</item>
+        <item quantity="few">%d عملاء</item>
+        <item quantity="many">%d عميلاً</item>
+        <item quantity="other">%d عميل</item>
+    </plurals>
+</resources>

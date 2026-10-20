@@ -1,0 +1,81 @@
+<resources>
+    <string name="app_name">Sawt+</string>
+    <string name="app_subtitle">Wireless Android microphone</string>
+
+    <string name="status_ready_wifi">● Ready over Wi‑Fi</string>
+    <string name="status_adb">● ADB connected</string>
+    <string name="status_running">● Service running</string>
+    <string name="status_stopped">○ Stopped</string>
+
+    <string name="pairing_label">PAIRING CODE</string>
+    <string name="pairing_empty">—</string>
+    <string name="pairing_hint">Tap the address to copy · long-press the code</string>
+    <string name="code_copied">Pairing code copied</string>
+    <string name="address_label">Wi‑Fi address</string>
+    <string name="address_copied">Address copied</string>
+    <string name="pairing_valid">%1$d min left · %2$d connected</string>
+    <string name="clients_connected">%d connected</string>
+
+    <string name="source_info">Source: %1$s · frames %2$d · dropped %3$d</string>
+    <string name="source_default">48 kHz · mono</string>
+
+    <string name="address_unavailable">Wi‑Fi address unavailable</string>
+    <string name="address_adb">USB/ADB transport</string>
+
+    <string name="action_start">Start service</string>
+    <string name="action_stop_service">Stop service</string>
+
+    <string name="transport">Transport</string>
+    <string name="transport_wifi">Wi‑Fi</string>
+    <string name="transport_adb">USB/ADB</string>
+
+    <string name="input_level">Input level</string>
+    <string name="mute_title">Mute microphone</string>
+    <string name="mute_subtitle">Send silence while keeping the connection</string>
+
+    <string name="battery_settings">Battery settings</string>
+    <string name="battery_card_title">Battery optimization</string>
+    <string name="battery_card_body">Set Battery usage to Unrestricted so the system keeps the microphone service alive in the background.</string>
+    <string name="battery_card_action">Open battery settings</string>
+
+    <string name="open_menu">Open menu</string>
+    <string name="close_menu">Close menu</string>
+
+    <string name="settings">Settings</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_device_name">Device name</string>
+    <string name="device_name_hint">Name shown to the computer</string>
+    <string name="device_name_saved">Device name saved</string>
+    <string name="settings_change">Change</string>
+    <string name="language_system">System default</string>
+    <string name="language_english">English</string>
+    <string name="language_arabic">العربية</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+
+    <string name="about">About</string>
+    <string name="about_version">Version %s</string>
+    <string name="about_body">Sawt+ turns your phone into a wireless microphone that streams live audio to a computer over Wi‑Fi, with USB/ADB as a fallback.\n\nBased on the original open-source project “audiosource” by gdzx. Streaming format: 16-bit PCM, 48 kHz, mono, 20 ms frames.</string>
+
+    <string name="how_to_connect">How to connect</string>
+    <string name="how_to_connect_body">1. Keep this phone on the same Wi‑Fi as the computer.\n2. On the computer run: sawt discover\n3. Pair with the 6‑digit code.\n4. The phone appears as a system microphone.\n\nUSB/ADB still works as a fallback: sawt adb run</string>
+
+    <string name="hint">Keep the service running in the background. On Realme/Oppo, set Battery usage to Unrestricted so the system does not kill the microphone service.\n\nFirst time? Install this app once, then use Wi‑Fi from the PC client (`sawt discover`, or `sawt web`).</string>
+
+    <string name="permission_microphone_required">Microphone permission is required to stream audio.</string>
+
+    <string name="notification_starting">Starting up…</string>
+    <string name="notification_waiting">Waiting for ADB or Wi‑Fi connection…</string>
+    <string name="notification_forwarding">Streaming to %s</string>
+    <string name="notification_wifi_status">Wi‑Fi %1$s:%2$d · %3$s</string>
+    <string name="action_stop">Stop</string>
+    <string name="channel_name">Sawt+</string>
+    <string name="channel_description">Android microphone streaming</string>
+
+    <plurals name="notification_clients">
+        <item quantity="one">%d client</item>
+        <item quantity="other">%d clients</item>
+    </plurals>
+</resources>

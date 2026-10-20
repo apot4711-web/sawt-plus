@@ -1,0 +1,21 @@
+Sawt+ turns your Android phone into a wireless microphone for a Linux computer. The phone captures its microphone and streams 48 kHz mono PCM over the local Wi-Fi network to a small headless daemon on the PC, which exposes it as a PipeWire or PulseAudio source.
+
+Features:
+
+* Wi-Fi first: both devices only need to be on the same local network.
+* Device discovery over mDNS, avahi, and an active network scan.
+* Pair once with a short code; later connections are automatic.
+* USB/ADB fallback when Wi-Fi is unavailable.
+* Control from the terminal or from an optional local web page.
+* Input level and mute controls on the phone and on the computer.
+* Arabic and English interface with Material 3 and RTL support.
+
+The computer side is required: it creates the virtual microphone and can be controlled with the sawt command-line client or its local browser interface at 127.0.0.1:8787.
+
+Requirements:
+
+* Android 7.0 (API 24) or newer.
+* Linux with PipeWire or PulseAudio and pactl in PATH.
+* Both devices on the same local network for Wi-Fi mode, or USB debugging for the ADB fallback.
+
+Sawt+ is based on the original open-source audiosource project by gdzx. It is a separate project and does not replace the original app.

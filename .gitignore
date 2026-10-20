@@ -1,0 +1,30 @@
+# Go
+/bin/
+/dist/
+*.test
+
+# Android
+.gradle/
+app/build/
+/local.properties
+/keystore.properties
+*.jks
+*.keystore
+.toolchain/
+
+# Web
+web/node_modules/
+web/dist/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# Local build output
+/audiosource
+/sawt
+
+# Private session handoff
+/STATE.md
