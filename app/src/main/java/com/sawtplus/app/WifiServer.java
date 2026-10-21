@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -392,11 +393,14 @@ final class WifiServer extends WebSocketServer {
             if (pairingCode.isEmpty() || now > pairingExpiresAt) {
                 generatePairingCodeLocked(now);
             }
-            pairAttempts.forEach((ip, state) -> {
+            Iterator<Map.Entry<String, PairAttempts>> it =
+                    pairAttempts.entrySet().iterator();
+            while (it.hasNext()) {
+                PairAttempts state = it.next().getValue();
                 if (now - state.lastFailure > PAIR_ATTEMPT_WINDOW_MS) {
-                    pairAttempts.remove(ip, state);
+                    it.remove();
                 }
-            });
+            }
         }
     }
 

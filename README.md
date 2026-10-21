@@ -159,7 +159,7 @@ control messages and binary audio frames.
 ## Requirements
 
 - Linux x86_64 with PipeWire or PulseAudio and `pactl` in `PATH`.
-- Android 7.0 (API 24) or newer.
+- Android 5.0 (API 21) or newer.
 - Both devices on the same local network for Wi-Fi mode, or USB debugging for
   the ADB fallback.
 - Optional: `avahi-utils`/`avahi-tools` for more reliable discovery.
@@ -250,7 +250,7 @@ with the original `audiosource` app.
 - The menu (top-left) opens Settings and About. Settings uses rows that open a
   choice dialog for Language (system/English/Arabic), Theme
   (system/light/dark), and the device name shown to the computer, plus the
-  battery-optimization shortcut.
+  battery-optimization shortcut (Android 6.0 and newer).
 - Set Battery usage to **Unrestricted** on aggressive ROMs (Realme/Oppo and
   similar) so the system does not kill the foreground microphone service.
 

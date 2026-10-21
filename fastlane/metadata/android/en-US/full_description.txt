@@ -14,7 +14,7 @@ The computer side is required: it creates the virtual microphone and can be cont
 
 Requirements:
 
-* Android 7.0 (API 24) or newer.
+* Android 5.0 (API 21) or newer.
 * Linux with PipeWire or PulseAudio and pactl in PATH.
 * Both devices on the same local network for Wi-Fi mode, or USB debugging for the ADB fallback.
 

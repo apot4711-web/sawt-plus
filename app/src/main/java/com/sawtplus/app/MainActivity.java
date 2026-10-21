@@ -21,6 +21,8 @@ import android.widget.TextView;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.GravityCompat;
 import androidx.core.view.ViewCompat;
@@ -97,7 +99,8 @@ public class MainActivity extends AppCompatActivity {
                 RecordService.start(this);
             }
         } else {
-            requestPermissions(missingPermissions().toArray(new String[0]), REQUEST_PERMISSIONS);
+            ActivityCompat.requestPermissions(this,
+                    missingPermissions().toArray(new String[0]), REQUEST_PERMISSIONS);
         }
         updateUi();
     }
@@ -120,11 +123,13 @@ public class MainActivity extends AppCompatActivity {
 
     private List<String> missingPermissions() {
         List<String> missing = new ArrayList<>();
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
             missing.add(Manifest.permission.RECORD_AUDIO);
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
             missing.add(Manifest.permission.POST_NOTIFICATIONS);
         }
         return missing;
@@ -217,7 +222,8 @@ public class MainActivity extends AppCompatActivity {
                 ServiceState.userStopped = false;
                 RecordService.start(this);
             } else {
-                requestPermissions(missingPermissions().toArray(new String[0]), REQUEST_PERMISSIONS);
+                ActivityCompat.requestPermissions(this,
+                        missingPermissions().toArray(new String[0]), REQUEST_PERMISSIONS);
             }
         });
 
@@ -333,6 +339,9 @@ public class MainActivity extends AppCompatActivity {
             dialog.dismiss();
             openBatterySettings();
         });
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            content.findViewById(R.id.rowBattery).setVisibility(View.GONE);
+        }
         dialog.show();
     }
 
@@ -546,7 +555,8 @@ public class MainActivity extends AppCompatActivity {
             gainSlider.setValue(clampGain(tokens.gain()));
         }
         updateGainLabel(gainSlider.getValue());
-        int batteryVisibility = tokens.batteryAcknowledged() ? View.GONE : View.VISIBLE;
+        int batteryVisibility = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && !tokens.batteryAcknowledged()) ? View.VISIBLE : View.GONE;
         if (batteryCard.getVisibility() != batteryVisibility) {
             batteryCard.setVisibility(batteryVisibility);
         }
@@ -598,13 +608,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openBatterySettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                return;
+            } catch (Exception ignored) {
+                // fall through to the app details page
+            }
+        }
         try {
-            Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-            startActivity(intent);
-        } catch (Exception e) {
-            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    Uri.parse("package:" + getPackageName()));
-            startActivity(intent);
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + getPackageName())));
+        } catch (Exception ignored) {
         }
     }
 }

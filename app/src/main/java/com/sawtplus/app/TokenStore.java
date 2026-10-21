@@ -2,12 +2,12 @@ package com.sawtplus.app;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Base64;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -142,7 +142,8 @@ final class TokenStore {
     String newToken() {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        return Base64.encodeToString(bytes,
+                Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
     }
 
     Set<String> tokens() {
