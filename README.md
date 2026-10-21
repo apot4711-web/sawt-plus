@@ -1,76 +1,82 @@
-# صوت+ (Sawt+)
+# Sawt+ (صوت+)
 
-حوّل هاتف أندرويد إلى ميكروفون لاسلكي لحاسوب لينكس. يلتقط الهاتف الصوت من
-الميكروفون ويبثّه بصيغة PCM أحادية بتردد 48 كيلوهرتز عبر شبكة Wi-Fi المحلية إلى
-خادم صغير بلا واجهة على الحاسوب، ثم يوفّره كمصدر صوتي في PipeWire أو PulseAudio.
-يمكنك التحكم به من الطرفية أو من صفحة ويب محلية اختيارية.
+**English** · [العربية](README.ar.md)
 
-Sawt+ مبني على مشروع [`gdzx/audiosource`](https://github.com/gdzx/audiosource)
-مفتوح المصدر، لكنه يستخدم Wi-Fi كنقل أساسي، ويضيف الاقتران والاكتشاف والتحكم في
-مستوى الصوت وتطبيق أندرويد بتصميم Material 3. هو مشروع منفصل ولا يستبدل التطبيق
-الأصلي.
+Sawt+ turns an Android phone into a wireless microphone for a Linux computer.
+The phone captures its microphone and streams 48 kHz mono PCM over the local
+Wi-Fi network to a small headless daemon on the PC, which exposes it as a
+PipeWire or PulseAudio source. You control it from the terminal or from an
+optional local web page.
 
-## التنزيل والتثبيت من الصفر
+Sawt+ is based on the open-source project
+[`gdzx/audiosource`](https://github.com/gdzx/audiosource), but uses Wi-Fi as the
+primary transport and adds pairing, discovery, input-level control, and a
+Material 3 Android app. It is a separate project and does not replace the
+original app.
 
-### ١. نزّل تطبيق الأندرويد
+## Download and install from scratch
 
-نزّل ملف APK الجاهز من المستودع:
+### 1. Install the Android app
 
-- من صفحة المشروع: [`apk/sawt-plus-2.0.0.apk`](apk/sawt-plus-2.0.0.apk)
-- أو [تحميل APK مباشرة](https://raw.githubusercontent.com/apot4711-web/sawt-plus/main/apk/sawt-plus-2.0.0.apk)
+Download the ready APK from the Releases page:
 
-افتح الملف على الهاتف، واسمح للمتصفح أو مدير الملفات بتثبيت التطبيقات من هذا
-المصدر. إذا ظهر تحذير Play Protect اختر **تثبيت على أي حال**.
+- [Latest release](https://github.com/apot4711-web/sawt-plus/releases/latest)
+- [Download `sawt-plus.apk`](https://github.com/apot4711-web/sawt-plus/releases/latest/download/sawt-plus.apk)
 
-> ملف APK موقّع بمفتاح التطوير (debug) وهو مناسب للتثبيت اليدوي والتجربة. لا
-> يحتاج التطبيق إلى حساب أو إنترنت، فقط إلى شبكة محلية مشتركة مع الحاسوب.
+Open the file on the phone and allow the browser or file manager to install
+apps from this source. If Play Protect shows a warning, choose **Install
+anyway**.
 
-إذا كان لديك ADB وملف APK محفوظ على الحاسوب:
+> The APK is debug-signed and intended for manual installation and testing. The
+> app needs no account or internet access, only a local network shared with the
+> computer.
+
+If you have ADB and the APK saved on the computer:
 
 ```bash
-adb install -r sawt-plus-2.0.0.apk
+adb install -r sawt-plus.apk
 ```
 
-### ٢. نزّل برنامج الحاسوب
+### 2. Install the computer program
 
-المتطلبات:
+Requirements:
 
-- لينكس بنظام **x86_64**.
-- PipeWire أو PulseAudio، مع الأمر `pactl` في `PATH`.
-- (اختياري) `avahi-browse` لتحسين الاكتشاف.
+- Linux on **x86_64**.
+- PipeWire or PulseAudio, with the `pactl` command in `PATH`.
+- Optional: `avahi-browse` for better discovery.
 
-على فيدورا:
+On Fedora:
 
 ```bash
 sudo dnf install pulseaudio-utils avahi-tools
 ```
 
-على دبيان/أوبونتو:
+On Debian/Ubuntu:
 
 ```bash
 sudo apt install pulseaudio-utils avahi-utils
 ```
 
-نزّل الملف التنفيذي الجاهز إلى مجلدك المحلي:
+Download the ready executable to your local directory:
 
 ```bash
 mkdir -p ~/.local/bin
 curl -fL -o ~/.local/bin/sawt \
-  https://raw.githubusercontent.com/apot4711-web/sawt-plus/main/bin/sawt-linux-amd64
+  https://github.com/apot4711-web/sawt-plus/releases/latest/download/sawt-linux-amd64
 chmod +x ~/.local/bin/sawt
 sawt version
 ```
 
-إذا ظهر `sawt: command not found` فأضف المجلد إلى `PATH`:
+If you get `sawt: command not found`, add the directory to `PATH`:
 
 ```bash
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-لا تحتاج إلى Go أو Android SDK لتشغيل البرنامج.
+You do not need Go or the Android SDK to run the program.
 
-بديل: استنسخ المستودع وشغّل الملف التنفيذي مباشرة:
+Alternative: clone the repository and run the executable directly:
 
 ```bash
 git clone https://github.com/apot4711-web/sawt-plus.git
@@ -78,111 +84,79 @@ cd sawt-plus
 ./bin/sawt-linux-amd64 version
 ```
 
-### ٣. شغّل الهاتف والحاسوب
+### 3. Run the phone and the computer
 
-1. افتح تطبيق **صوت+** على الهاتف.
-2. اضغط **تشغيل الخدمة** واسمح بإذن الميكروفون.
-3. لاحظ رمز الاقتران المكوّن من ٦ أرقام، وابقِ التطبيق يعمل في الخلفية.
-4. على الحاسوب شغّل:
+1. Open the **Sawt+** app on the phone.
+2. Tap **Start service** and grant microphone permission.
+3. Note the 6-digit pairing code and keep the app running in the background.
+4. On the computer, run:
 
 ```bash
 sawt web
 ```
 
-سيفتح المتصفح على `http://127.0.0.1:8787`. اختر الهاتف من القائمة، أدخل رمز
-الاقتران، ثم ابدأ البث. بعد الاقتران الأول يصبح الاتصال تلقائياً.
+The browser opens at `http://127.0.0.1:8787`. Select the phone, enter the
+pairing code, and start streaming. After the first pairing, the connection is
+automatic.
 
-بديل من الطرفية:
+Alternative from the terminal:
 
 ```bash
 sawt discover
 sawt pair 192.168.1.42:8765 123456
 ```
 
-استبدل العنوان والرمز بما يظهر عندك.
+Replace the address and code with the ones shown on your devices.
 
-### ٤. اختر الميكروفون
+### 4. Select the microphone
 
-سيُنشئ الحاسوب مصدراً صوتياً باسم `sawt-plus`. اختره كميكروفون في تطبيق
-الاجتماعات أو التسجيل. للتحكم في مستوى الصوت اختر **مستوى الصوت** داخل
-التطبيق، أو استخدم:
+The computer creates an audio source named `sawt-plus`. Select it as the
+microphone in your meeting or recording application. To adjust the level, use
+**Input level** in the app, or run:
 
 ```bash
 sawt gain 1.5x
 sawt mute on
 ```
 
-إذا لم يظهر المصدر، ثبّت `pavucontrol` وافتحه للتأكد من اختيار
-**Sawt+** كمصدر افتراضي.
+If the source does not appear, install `pavucontrol` and open it to make sure
+**Sawt+** is selected as the default source.
 
-### التحديث والإزالة
+### Updating and removal
 
-- **تحديث التطبيق**: نزّل أحدث APK ثم ثبّته فوق النسخة الحالية.
-- **إزالة التطبيق**: `adb uninstall com.sawtplus.app` أو من إعدادات أندرويد.
-- **إزالة برنامج الحاسوب**: احذف `~/.local/bin/sawt`، واختيارياً
+- **Update the app**: download the latest APK and install it over the current
+  version.
+- **Remove the app**: `adb uninstall com.sawtplus.app`, or uninstall it from
+  Android settings.
+- **Remove the computer program**: delete `~/.local/bin/sawt` and, optionally,
   `~/.config/sawt-plus`.
 
-### التحقق من سلامة الملفات
+### Verifying file integrity
 
-إذا استنسخت المستودع كاملاً:
+Download all release assets into the same directory, then run:
 
 ```bash
 sha256sum -c SHA256SUMS
 ```
 
-## المزايا
+If you cloned the full repository, the same command works from the repo root.
 
-- **Wi-Fi أولاً** على الشبكة المحلية، مع USB/ADB كبديل.
-- **اكتشاف متعدد الطبقات**: mDNS و`avahi-browse` ومسح نشط للشبكة، مدموجة في
-  قائمة أجهزة واحدة.
-- **اقتران مرة واحدة**: أدخل الرمز المكوّن من ٦ أرقام، ويُحفظ الرمز للاتصال
-  التلقائي لاحقاً.
-- **تحكم من الهاتف والحاسوب**: كتم الصوت ومستوى الصوت في التطبيق والطرفية
-  وصفحة الويب.
-- **واجهة ويب محلية اختيارية** يقدّمها الخادم؛ لا تحتاج Node.js.
-- **تطبيق Material 3** بالعربية والإنجليزية مع دعم RTL والثيمات.
+## Features
 
-البث هو PCM موقّع 16 بت، 48 كيلوهرتز، أحادي، بإطارات كل 20 مللي ثانية عبر
-WebSocket: رسائل تحكم نصية وإطارات صوت ثنائية.
+- **Wi-Fi first** on the local network, with USB/ADB as a fallback.
+- **Multi-layer discovery**: mDNS, `avahi-browse`, and an active network scan,
+  merged into one device list.
+- **Pair once**: enter the 6-digit code and the token is saved for automatic
+  connections later.
+- **Control from phone and computer**: mute and input level in the app, the
+  terminal, and the web page.
+- **Optional local web UI** served by the daemon; no Node.js required.
+- **Material 3 app** with English and Arabic support, RTL, and themes.
 
----
+Audio is signed 16-bit PCM, 48 kHz, mono, in 20 ms frames over WebSocket: text
+control messages and binary audio frames.
 
-## English
-
-Sawt+ turns an Android phone into a wireless microphone for a Linux computer.
-The phone captures its microphone and streams 48 kHz mono PCM to a small
-headless daemon on the PC, which exposes it as a PipeWire/PulseAudio source.
-
-### Install
-
-1. Download [`apk/sawt-plus-2.0.0.apk`](apk/sawt-plus-2.0.0.apk) and install
-   it on the phone. Allow installs from your browser or file manager if asked.
-2. Download the prebuilt Linux binary:
-
-```bash
-mkdir -p ~/.local/bin
-curl -fL -o ~/.local/bin/sawt \
-  https://raw.githubusercontent.com/apot4711-web/sawt-plus/main/bin/sawt-linux-amd64
-chmod +x ~/.local/bin/sawt
-sawt version
-```
-
-3. On the phone, open Sawt+, start the service, grant microphone permission,
-   and note the 6-digit pairing code.
-4. On the PC:
-
-```bash
-sawt web
-```
-
-Select the phone, enter the code, and start streaming. The PC creates a source
-named `sawt-plus`; select it as the microphone in your meeting or recording
-application.
-
-The APK is debug-signed and intended for direct sideloading. The Linux binary is
-static and needs no Go toolchain. It requires `pactl` (PipeWire or PulseAudio).
-
-### Requirements
+## Requirements
 
 - Linux x86_64 with PipeWire or PulseAudio and `pactl` in `PATH`.
 - Android 7.0 (API 24) or newer.
@@ -190,7 +164,7 @@ static and needs no Go toolchain. It requires `pactl` (PipeWire or PulseAudio).
   the ADB fallback.
 - Optional: `avahi-utils`/`avahi-tools` for more reliable discovery.
 
-### CLI
+## CLI
 
 ```console
 $ sawt help
@@ -218,7 +192,7 @@ Most commands start `sawt daemon` in the background (detached, log at
 `~/.config/sawt-plus/daemon.log`) if the API is not reachable. Set
 `SAWT_NO_AUTOSTART=1` to require an explicit daemon.
 
-### Discovery and the firewall
+## Discovery and the firewall
 
 Discovery tries three layers and merges the results:
 
@@ -246,15 +220,15 @@ $ sudo ufw allow 5353/udp
 The active scan works without the mDNS exception, as long as the phone accepts
 connections on port 8765 in the local network.
 
-### Input level
+## Input level
 
 The PC applies a digital gain in the daemon, and the Android app has its own
-"مستوى الصوت" slider that scales the captured samples before sending them. The
+"Input level" slider that scales the captured samples before sending them. The
 two controls are independent: leave one at 1.00× and adjust the other. Both are
 named "مستوى الصوت" / "Input level" in the UI to avoid the technical term
 "gain" in user-facing text.
 
-### USB/ADB fallback
+## USB/ADB fallback
 
 Wi-Fi is the intended transport, but ADB still works when both devices are on
 different networks or when Wi-Fi is unreliable.
@@ -268,7 +242,7 @@ different networks or when Wi-Fi is unreliable.
 The app exposes a separate ADB socket (`sawt-plus`), so it does not collide
 with the original `audiosource` app.
 
-### Android app
+## Android app
 
 - The home screen shows the connection status, address, pairing code, transport
   (Wi-Fi / USB-ADB), input level, and mute.
@@ -280,7 +254,7 @@ with the original `audiosource` app.
 - Set Battery usage to **Unrestricted** on aggressive ROMs (Realme/Oppo and
   similar) so the system does not kill the foreground microphone service.
 
-### Troubleshooting
+## Troubleshooting
 
 - **No devices found**: make sure the app is running on the phone and both
   devices are on the same network. Check the firewall note above. Try
@@ -299,7 +273,7 @@ with the original `audiosource` app.
   `~/.config/sawt-plus/api.token` with mode `0600`; the browser receives it
   once and keeps it in an HttpOnly cookie.
 
-### Project layout
+## Project layout
 
 - `apk/`: ready-to-install Android APK.
 - `bin/`: prebuilt Linux daemon binary.
