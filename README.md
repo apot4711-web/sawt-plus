@@ -294,6 +294,10 @@ with the original `audiosource` app.
 - **Stream stops in the background**: disable battery optimization for the app.
 - **ADB not found**: install Android platform tools and re-check `adb devices`.
 - **`sawt: command not found`**: add `~/.local/bin` to `PATH`.
+- **The web page says it needs the local access token**: open it with `sawt web`
+  (or use the URL printed by `sawt web --no-open`). The token lives in
+  `~/.config/sawt-plus/api.token` with mode `0600`; the browser receives it
+  once and keeps it in an HttpOnly cookie.
 
 ### Project layout
 

@@ -19,10 +19,13 @@ import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.SocketException;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,6 +41,12 @@ final class WifiServer extends WebSocketServer {
     private static final String TAG = App.TAG;
     private static final String SERVICE_TYPE = "_sawtplus._tcp.";
     private static final long PAIRING_TTL_MS = 10 * 60 * 1000L;
+    private static final long AUTH_TIMEOUT_MS = 15 * 1000L;
+    private static final int MAX_PENDING_CONNECTIONS = 16;
+    private static final int MAX_CLIENTS = 8;
+    private static final int FREE_PAIR_ATTEMPTS = 5;
+    private static final int MAX_PAIR_DELAY_SECONDS = 30;
+    private static final long PAIR_ATTEMPT_WINDOW_MS = 10 * 60 * 1000L;
 
     private final Context context;
     private final StreamHub hub;
@@ -49,6 +58,8 @@ final class WifiServer extends WebSocketServer {
 
     private final Map<WebSocket, Session> sessions = new ConcurrentHashMap<>();
     private final Map<WebSocket, WifiClient> clients = new ConcurrentHashMap<>();
+    private final Map<String, PairAttempts> pairAttempts = new ConcurrentHashMap<>();
+    private final Object pairingLock = new Object();
 
     private NsdManager nsdManager;
     private NsdManager.RegistrationListener registrationListener;
@@ -89,6 +100,7 @@ final class WifiServer extends WebSocketServer {
         });
         scheduler.scheduleAtFixedRate(this::refreshPairingCode, 30, 30, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(this::sendStats, 2, 2, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(this::closeStaleSessions, 5, 5, TimeUnit.SECONDS);
 
         start();
         registerMdns();
@@ -132,7 +144,20 @@ final class WifiServer extends WebSocketServer {
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
-        sessions.put(conn, new Session());
+        synchronized (sessions) {
+            int pending = 0;
+            for (Session session : sessions.values()) {
+                if (!session.authenticated) {
+                    pending++;
+                }
+            }
+            if (pending >= MAX_PENDING_CONNECTIONS) {
+                Log.w(TAG, "rejecting pending client: too many unauthenticated connections");
+                conn.close(1013, "too many pending connections");
+                return;
+            }
+            sessions.put(conn, new Session(System.currentTimeMillis()));
+        }
         Log.i(TAG, "Wi-Fi client connected: " + conn.getRemoteSocketAddress());
     }
 
@@ -160,14 +185,34 @@ final class WifiServer extends WebSocketServer {
                     }
                     break;
                 case "pair":
+                    if (session.authenticated) {
+                        sendError(conn, "already paired");
+                        break;
+                    }
+                    String ip = remoteIp(conn);
+                    long cooldown = pairCooldownSeconds(ip);
+                    if (cooldown > 0) {
+                        sendError(conn, "too many attempts; try again in " + cooldown + "s", cooldown);
+                        break;
+                    }
                     String code = obj.optString("code", "");
                     if (validPairingCode(code)) {
                         String token = tokens.newToken();
                         tokens.add(token);
+                        // The code is single-use: rotate it before the next
+                        // client can try. Rotating also clears throttles.
+                        synchronized (pairingLock) {
+                            rotatePairingCodeLocked();
+                            pairAttempts.clear();
+                        }
                         sendPaired(conn, token);
                         authenticate(conn, session);
                     } else {
-                        sendError(conn, "invalid or expired pairing code");
+                        long retry = recordPairFailure(ip);
+                        String errorText = retry > 0
+                                ? "invalid or expired pairing code; try again in " + retry + "s"
+                                : "invalid or expired pairing code";
+                        sendError(conn, errorText, retry);
                     }
                     break;
                 case "ping":
@@ -215,6 +260,11 @@ final class WifiServer extends WebSocketServer {
     private void authenticate(WebSocket conn, Session session) {
         synchronized (session) {
             if (session.authenticated) {
+                return;
+            }
+            if (clients.size() >= MAX_CLIENTS) {
+                sendError(conn, "too many connected clients");
+                conn.close(1013, "too many connected clients");
                 return;
             }
             session.authenticated = true;
@@ -295,10 +345,17 @@ final class WifiServer extends WebSocketServer {
     }
 
     private void sendError(WebSocket conn, String message) {
+        sendError(conn, message, 0);
+    }
+
+    private void sendError(WebSocket conn, String message, long retryAfter) {
         JSONObject obj = new JSONObject();
         try {
             obj.put("type", "error");
             obj.put("error", message);
+            if (retryAfter > 0) {
+                obj.put("retry_after", retryAfter);
+            }
         } catch (JSONException ignored) {
         }
         conn.send(obj.toString());
@@ -330,19 +387,110 @@ final class WifiServer extends WebSocketServer {
     // ------------------------------------------------------------------
 
     private void refreshPairingCode() {
-        long now = System.currentTimeMillis();
-        if (pairingCode.isEmpty() || now > pairingExpiresAt) {
-            pairingCode = String.format("%06d", 100000 + random.nextInt(900000));
-            pairingExpiresAt = now + PAIRING_TTL_MS;
-            ServiceState.pairingCode = pairingCode;
-            ServiceState.pairingExpiresAt = pairingExpiresAt;
+        synchronized (pairingLock) {
+            long now = System.currentTimeMillis();
+            if (pairingCode.isEmpty() || now > pairingExpiresAt) {
+                generatePairingCodeLocked(now);
+            }
+            pairAttempts.forEach((ip, state) -> {
+                if (now - state.lastFailure > PAIR_ATTEMPT_WINDOW_MS) {
+                    pairAttempts.remove(ip, state);
+                }
+            });
         }
     }
 
+    /** Invalidates the current code and gives the user a fresh one. */
+    void rotatePairingCode() {
+        synchronized (pairingLock) {
+            rotatePairingCodeLocked();
+            pairAttempts.clear();
+        }
+    }
+
+    private void rotatePairingCodeLocked() {
+        generatePairingCodeLocked(System.currentTimeMillis());
+    }
+
+    private void generatePairingCodeLocked(long now) {
+        pairingCode = String.format(Locale.US, "%06d", 100000 + random.nextInt(900000));
+        pairingExpiresAt = now + PAIRING_TTL_MS;
+        ServiceState.pairingCode = pairingCode;
+        ServiceState.pairingExpiresAt = pairingExpiresAt;
+    }
+
     private boolean validPairingCode(String code) {
-        refreshPairingCode();
-        return code != null && !code.isEmpty() && code.equals(pairingCode)
-                && System.currentTimeMillis() <= pairingExpiresAt;
+        synchronized (pairingLock) {
+            long now = System.currentTimeMillis();
+            if (pairingCode.isEmpty() || now > pairingExpiresAt) {
+                generatePairingCodeLocked(now);
+            }
+            if (code == null || code.isEmpty() || now > pairingExpiresAt) {
+                return false;
+            }
+            return MessageDigest.isEqual(
+                    code.getBytes(StandardCharsets.US_ASCII),
+                    pairingCode.getBytes(StandardCharsets.US_ASCII));
+        }
+    }
+
+    // A wrong code from the same address slows down further attempts instead
+    // of locking the user out. The delay is per IP and resets on success or
+    // after a quiet period.
+    private long pairCooldownSeconds(String ip) {
+        PairAttempts state = pairAttempts.get(ip);
+        if (state == null) {
+            return 0;
+        }
+        long now = System.currentTimeMillis();
+        if (now - state.lastFailure > PAIR_ATTEMPT_WINDOW_MS) {
+            pairAttempts.remove(ip);
+            return 0;
+        }
+        long left = state.nextAllowedAt - now;
+        return left > 0 ? (left + 999) / 1000 : 0;
+    }
+
+    private long recordPairFailure(String ip) {
+        synchronized (pairingLock) {
+            long now = System.currentTimeMillis();
+            PairAttempts previous = pairAttempts.get(ip);
+            if (previous != null && now - previous.lastFailure > PAIR_ATTEMPT_WINDOW_MS) {
+                previous = null;
+            }
+            int failures = previous == null ? 1 : previous.failures + 1;
+            long delay = pairDelaySeconds(failures);
+            pairAttempts.put(ip, new PairAttempts(failures, now, now + delay * 1000L));
+            return delay;
+        }
+    }
+
+    private static long pairDelaySeconds(int failures) {
+        if (failures <= FREE_PAIR_ATTEMPTS) {
+            return 0;
+        }
+        int shift = Math.min(failures - FREE_PAIR_ATTEMPTS - 1, 10);
+        return Math.min(MAX_PAIR_DELAY_SECONDS, 1L << shift);
+    }
+
+    private static String remoteIp(WebSocket conn) {
+        InetSocketAddress address = conn.getRemoteSocketAddress();
+        if (address == null || address.getAddress() == null) {
+            return "unknown";
+        }
+        return address.getAddress().getHostAddress();
+    }
+
+    private void closeStaleSessions() {
+        long now = System.currentTimeMillis();
+        for (Map.Entry<WebSocket, Session> entry : sessions.entrySet()) {
+            Session session = entry.getValue();
+            synchronized (session) {
+                if (!session.authenticated && now - session.openedAt > AUTH_TIMEOUT_MS) {
+                    entry.getKey().close(1008, "authentication timeout");
+                }
+            }
+        }
     }
 
     // ------------------------------------------------------------------
@@ -500,7 +648,24 @@ final class WifiServer extends WebSocketServer {
     // ------------------------------------------------------------------
 
     private static final class Session {
-        boolean authenticated;
+        final long openedAt;
+        volatile boolean authenticated;
+
+        Session(long openedAt) {
+            this.openedAt = openedAt;
+        }
+    }
+
+    private static final class PairAttempts {
+        final int failures;
+        final long lastFailure;
+        final long nextAllowedAt;
+
+        PairAttempts(int failures, long lastFailure, long nextAllowedAt) {
+            this.failures = failures;
+            this.lastFailure = lastFailure;
+            this.nextAllowedAt = nextAllowedAt;
+        }
     }
 
     private final class WifiClient implements StreamHub.Sink {

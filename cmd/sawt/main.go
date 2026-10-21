@@ -98,15 +98,31 @@ func newDaemon() (*daemon.Daemon, *config.Config, error) {
 }
 
 func runDaemon(args []string) int {
+	lock, err := config.AcquireDaemonLock()
+	if err != nil {
+		if errors.Is(err, config.ErrDaemonRunning) {
+			log.Error("daemon", "err", "another sawt daemon is already running")
+		} else {
+			log.Error("lock", "err", err)
+		}
+		return 1
+	}
+	defer lock.Close()
+
 	d, cfg, err := newDaemon()
 	if err != nil {
 		log.Error("load config", "err", err)
 		return 1
 	}
+	token, err := config.LoadAPIToken()
+	if err != nil {
+		log.Error("load API token", "err", err)
+		return 1
+	}
 	ctx, cancel := signalContext()
 	defer cancel()
 
-	server := api.New(d, log.Default())
+	server := api.New(d, log.Default(), token)
 	server.SetShutdown(cancel)
 	go func() {
 		if err := server.Start(ctx, cfg.Daemon.WebAddr); err != nil {
@@ -130,7 +146,12 @@ func runShutdown(args []string) int {
 		log.Error("load config", "err", err)
 		return 1
 	}
-	c := client.New(cfg.Daemon.WebAddr)
+	token, err := config.LoadAPIToken()
+	if err != nil {
+		log.Error("load API token", "err", err)
+		return 1
+	}
+	c := client.New(cfg.Daemon.WebAddr, token)
 	if !daemonAlive(c) {
 		fmt.Println("daemon is not running")
 		return 0
@@ -152,7 +173,11 @@ func ensureDaemon() (*client.Client, *config.Config, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	c := client.New(cfg.Daemon.WebAddr)
+	token, err := config.LoadAPIToken()
+	if err != nil {
+		return nil, nil, err
+	}
+	c := client.New(cfg.Daemon.WebAddr, token)
 	if daemonAlive(c) {
 		return c, cfg, nil
 	}
@@ -218,7 +243,7 @@ func runWeb(args []string) int {
 		log.Error("daemon", "err", err)
 		return 1
 	}
-	target := "http://" + c.Addr()
+	target := "http://" + c.Addr() + "/?token=" + url.QueryEscape(c.Token())
 	if open {
 		openBrowser(target)
 	} else {

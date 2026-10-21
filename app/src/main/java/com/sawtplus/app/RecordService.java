@@ -26,6 +26,7 @@ public class RecordService extends Service {
     static final String ACTION_START = App.PKG + ".START";
     static final String ACTION_STOP = App.PKG + ".STOP";
     static final String ACTION_RELOAD = App.PKG + ".RELOAD";
+    static final String ACTION_NEW_CODE = App.PKG + ".NEW_CODE";
 
     private static final String CHANNEL_ID = "sawt";
     private static final int NOTIFICATION_ID = 1;
@@ -60,6 +61,11 @@ public class RecordService extends Service {
         ContextCompat.startForegroundService(context, intent);
     }
 
+    static void newPairingCode(Context context) {
+        Intent intent = new Intent(context, RecordService.class).setAction(ACTION_NEW_CODE);
+        context.startService(intent);
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -87,6 +93,8 @@ public class RecordService extends Service {
         if (ACTION_RELOAD.equals(action)) {
             stopWifi();
             applyTransportPreference();
+        } else if (ACTION_NEW_CODE.equals(action) && wifiServer != null) {
+            wifiServer.rotatePairingCode();
         }
 
         updateNotification();

@@ -9,7 +9,10 @@
 
     <string name="pairing_label">رمز الاقتران</string>
     <string name="pairing_empty">—</string>
-    <string name="pairing_hint">اضغط على العنوان لنسخه · واضغط مطوّلاً على الرمز</string>
+    <string name="pairing_hint">اضغط على العنوان لنسخه · واضغط مطوّلاً على الرمز · استخدم «رمز جديد» بعد محاولة فاشلة</string>
+    <string name="action_new_code">رمز جديد</string>
+    <string name="code_refreshed">تم توليد رمز اقتران جديد</string>
+    <string name="code_requires_service">شغّل الخدمة أولاً</string>
     <string name="code_copied">تم نسخ رمز الاقتران</string>
     <string name="address_label">عنوان Wi‑Fi</string>
     <string name="address_copied">تم نسخ العنوان</string>

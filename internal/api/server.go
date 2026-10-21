@@ -4,6 +4,7 @@ package api
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,11 +23,17 @@ import (
 	"github.com/apot4711-web/sawt-plus/internal/web"
 )
 
+const (
+	authCookie = "sawt_api"
+	authPrefix = "Bearer "
+)
+
 type Server struct {
 	daemon   *daemon.Daemon
 	http     *http.Server
 	log      *log.Logger
 	assets   fs.FS
+	token    string
 	shutdown func()
 }
 
@@ -34,12 +41,12 @@ type Server struct {
 // used by the /api/shutdown endpoint.
 func (s *Server) SetShutdown(fn func()) { s.shutdown = fn }
 
-func New(d *daemon.Daemon, logger *log.Logger) *Server {
+func New(d *daemon.Daemon, logger *log.Logger, token string) *Server {
 	assets, err := web.FS()
 	if err != nil {
 		assets = nil
 	}
-	return &Server{daemon: d, log: logger, assets: assets}
+	return &Server{daemon: d, log: logger, assets: assets, token: token}
 }
 
 func (s *Server) Start(ctx context.Context, addr string) error {
@@ -65,7 +72,7 @@ func (s *Server) Start(ctx context.Context, addr string) error {
 	mux.HandleFunc("/", s.handleStatic)
 
 	s.http = &http.Server{
-		Handler:           withMiddleware(mux),
+		Handler:           withMiddleware(s.token, mux),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	s.log.Info("http interface listening", "addr", listener.Addr().String())
@@ -85,11 +92,44 @@ func (s *Server) Start(ctx context.Context, addr string) error {
 	}
 }
 
-// withMiddleware keeps the local API same-origin only and requires JSON for
-// state-changing requests. This prevents a random website from controlling the
+// withMiddleware requires the local API token for every /api/ request, keeps
+// the API same-origin only, and requires JSON for state-changing requests.
+// This prevents another local user or a random website from listening to the
 // microphone through 127.0.0.1.
-func withMiddleware(next http.Handler) http.Handler {
+func withMiddleware(token string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// `sawt web` opens the UI with ?token=...; exchange it for an HttpOnly
+		// cookie and remove it from the address bar.
+		if r.URL.Path == "/" {
+			if supplied := r.URL.Query().Get("token"); supplied != "" {
+				if !tokensEqual(supplied, token) {
+					http.Error(w, "invalid API token; run: sawt web", http.StatusUnauthorized)
+					return
+				}
+				http.SetCookie(w, &http.Cookie{
+					Name:     authCookie,
+					Value:    token,
+					Path:     "/",
+					HttpOnly: true,
+					SameSite: http.SameSiteStrictMode,
+				})
+				target := "/"
+				if lang := r.URL.Query().Get("lang"); lang != "" {
+					target += "?lang=" + url.QueryEscape(lang)
+				}
+				http.Redirect(w, r, target, http.StatusSeeOther)
+				return
+			}
+		}
+
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			if !requestAuthorized(r, token) {
+				writeError(w, http.StatusUnauthorized, errors.New("unauthorized; open the UI with: sawt web"))
+				return
+			}
+			w.Header().Set("Cache-Control", "no-store")
+		}
+
 		if origin := r.Header.Get("Origin"); origin != "" {
 			u, err := url.Parse(origin)
 			if err != nil || !strings.EqualFold(u.Host, r.Host) {
@@ -106,6 +146,29 @@ func withMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func requestAuthorized(r *http.Request, token string) bool {
+	if token == "" {
+		return false
+	}
+	supplied := ""
+	if header := r.Header.Get("Authorization"); strings.HasPrefix(header, authPrefix) {
+		supplied = strings.TrimSpace(strings.TrimPrefix(header, authPrefix))
+	}
+	if supplied == "" {
+		if cookie, err := r.Cookie(authCookie); err == nil {
+			supplied = cookie.Value
+		}
+	}
+	return tokensEqual(supplied, token)
+}
+
+func tokensEqual(got, want string) bool {
+	if got == "" || want == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -179,7 +242,15 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
-	CheckOrigin:     func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			// Non-browser local clients still need the API token.
+			return true
+		}
+		u, err := url.Parse(origin)
+		return err == nil && strings.EqualFold(u.Host, r.Host)
+	},
 }
 
 func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
@@ -309,9 +380,8 @@ func (s *Server) handleMute(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
-	cfg := s.daemon.Config()
 	if r.Method == http.MethodGet {
-		writeJSON(w, http.StatusOK, cfg)
+		writeJSON(w, http.StatusOK, publicConfig(s.daemon.Config()))
 		return
 	}
 	if r.Method == http.MethodPut {
@@ -320,15 +390,26 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, err)
 			return
 		}
-		*cfg = incoming
-		if err := s.daemon.SaveConfig(); err != nil {
+		if err := s.daemon.UpdateConfig(incoming); err != nil {
 			writeError(w, http.StatusInternalServerError, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, cfg)
+		writeJSON(w, http.StatusOK, publicConfig(s.daemon.Config()))
 		return
 	}
 	w.WriteHeader(http.StatusMethodNotAllowed)
+}
+
+// publicConfig strips pairing tokens before a configuration is sent to a
+// browser or any other API caller.
+func publicConfig(cfg config.Config) config.Config {
+	devices := make([]config.DeviceEntry, len(cfg.Devices))
+	copy(devices, cfg.Devices)
+	for i := range devices {
+		devices[i].Token = ""
+	}
+	cfg.Devices = devices
+	return cfg
 }
 
 func (s *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {
@@ -347,6 +428,12 @@ func (s *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("Content-Security-Policy",
+		"default-src 'self'; script-src 'self' 'unsafe-inline'; "+
+			"style-src 'self' 'unsafe-inline'; img-src 'self' data:; "+
+			"media-src 'self'; connect-src 'self' ws:")
 	if s.assets == nil {
 		http.NotFound(w, r)
 		return

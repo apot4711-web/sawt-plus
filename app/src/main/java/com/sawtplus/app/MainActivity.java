@@ -55,6 +55,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView errorView;
     private MaterialButton startButton;
     private MaterialButton batteryButton;
+    private MaterialButton newCodeButton;
     private MaterialButtonToggleGroup transportGroup;
     private MaterialSwitch muteSwitch;
     private Slider gainSlider;
@@ -158,6 +159,7 @@ public class MainActivity extends AppCompatActivity {
         errorView = findViewById(R.id.errorView);
         startButton = findViewById(R.id.startButton);
         batteryButton = findViewById(R.id.batteryButton);
+        newCodeButton = findViewById(R.id.newCodeButton);
         batteryCard = findViewById(R.id.batteryCard);
         transportGroup = findViewById(R.id.transportGroup);
         muteSwitch = findViewById(R.id.muteSwitch);
@@ -251,6 +253,16 @@ public class MainActivity extends AppCompatActivity {
 
         codeView.setOnLongClickListener(v -> copyPairingCode());
         addressView.setOnClickListener(v -> copyAddress());
+        newCodeButton.setOnClickListener(v -> {
+            if (!ServiceState.running || !ServiceState.wifiEnabled) {
+                Snackbar.make(findViewById(R.id.root),
+                        R.string.code_requires_service, Snackbar.LENGTH_SHORT).show();
+                return;
+            }
+            RecordService.newPairingCode(this);
+            Snackbar.make(findViewById(R.id.root),
+                    R.string.code_refreshed, Snackbar.LENGTH_SHORT).show();
+        });
 
         gainSlider.setValue(clampGain(tokens.gain()));
         updateGainLabel(gainSlider.getValue());
@@ -518,6 +530,9 @@ public class MainActivity extends AppCompatActivity {
         setTextIfChanged(startButton, getText(running
                 ? R.string.action_stop_service
                 : R.string.action_start));
+        if (newCodeButton != null) {
+            newCodeButton.setEnabled(wifi && running);
+        }
 
         syncingUi = true;
         int transportId = wifiPref ? R.id.transportWifi : R.id.transportAdb;

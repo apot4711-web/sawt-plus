@@ -10,28 +10,29 @@ import (
 const Version = 1
 
 type Message struct {
-	Type     string  `json:"type"`
-	Version  int     `json:"version,omitempty"`
-	ID       string  `json:"id,omitempty"`
-	Name     string  `json:"name,omitempty"`
-	Token    string  `json:"token,omitempty"`
-	Code     string  `json:"code,omitempty"`
-	Client   string  `json:"client,omitempty"`
-	Rate     int     `json:"rate,omitempty"`
-	Channels int     `json:"channels,omitempty"`
-	Format   string  `json:"format,omitempty"`
-	FrameMS  int     `json:"frame_ms,omitempty"`
-	Pairing  bool    `json:"pairing,omitempty"`
-	RTT      int64   `json:"rtt_ms,omitempty"`
-	Dropped  uint64  `json:"dropped,omitempty"`
-	Clients  int     `json:"clients,omitempty"`
-	Gain     float64 `json:"gain,omitempty"`
-	Mute     bool    `json:"mute,omitempty"`
-	Level    float64 `json:"level,omitempty"`
-	Frames   uint64  `json:"frames,omitempty"`
-	Bytes    uint64  `json:"bytes,omitempty"`
-	Error    string  `json:"error,omitempty"`
-	T        int64   `json:"t,omitempty"`
+	Type       string  `json:"type"`
+	Version    int     `json:"version,omitempty"`
+	ID         string  `json:"id,omitempty"`
+	Name       string  `json:"name,omitempty"`
+	Token      string  `json:"token,omitempty"`
+	Code       string  `json:"code,omitempty"`
+	Client     string  `json:"client,omitempty"`
+	Rate       int     `json:"rate,omitempty"`
+	Channels   int     `json:"channels,omitempty"`
+	Format     string  `json:"format,omitempty"`
+	FrameMS    int     `json:"frame_ms,omitempty"`
+	Pairing    bool    `json:"pairing,omitempty"`
+	RTT        int64   `json:"rtt_ms,omitempty"`
+	Dropped    uint64  `json:"dropped,omitempty"`
+	Clients    int     `json:"clients,omitempty"`
+	Gain       float64 `json:"gain,omitempty"`
+	Mute       bool    `json:"mute,omitempty"`
+	Level      float64 `json:"level,omitempty"`
+	Frames     uint64  `json:"frames,omitempty"`
+	Bytes      uint64  `json:"bytes,omitempty"`
+	Error      string  `json:"error,omitempty"`
+	RetryAfter int64   `json:"retry_after,omitempty"`
+	T          int64   `json:"t,omitempty"`
 }
 
 func Encode(m Message) ([]byte, error) {

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -8,12 +10,57 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/BurntSushi/toml"
+	"golang.org/x/sys/unix"
 )
 
 // Config is the on-disk configuration for the sawt daemon.
+// ErrDaemonRunning is returned when another sawt daemon already holds the
+// single-instance lock.
+var ErrDaemonRunning = errors.New("another sawt daemon is already running")
+
+// DaemonLock is the process-wide single-instance lock held by the daemon.
+type DaemonLock struct {
+	f *os.File
+}
+
+// AcquireDaemonLock takes the daemon lock without blocking. The lock is
+// released when the returned DaemonLock is closed or the process exits.
+func AcquireDaemonLock() (*DaemonLock, error) {
+	if err := os.MkdirAll(Dir(), 0o700); err != nil {
+		return nil, fmt.Errorf("create config directory: %w", err)
+	}
+	path := filepath.Join(Dir(), "daemon.lock")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("open %s: %w", path, err)
+	}
+	if err := unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+		_ = f.Close()
+		if errors.Is(err, unix.EWOULDBLOCK) {
+			return nil, ErrDaemonRunning
+		}
+		return nil, fmt.Errorf("lock %s: %w", path, err)
+	}
+	_ = f.Truncate(0)
+	_, _ = f.WriteAt([]byte(strconv.Itoa(os.Getpid())+"\n"), 0)
+	return &DaemonLock{f: f}, nil
+}
+
+// Close releases the daemon lock.
+func (l *DaemonLock) Close() error {
+	if l == nil || l.f == nil {
+		return nil
+	}
+	_ = unix.Flock(int(l.f.Fd()), unix.LOCK_UN)
+	err := l.f.Close()
+	l.f = nil
+	return err
+}
+
 type Config struct {
 	Audio   AudioConfig   `toml:"audio"`
 	Daemon  DaemonConfig  `toml:"daemon"`
@@ -86,6 +133,80 @@ func Path() string {
 	return filepath.Join(Dir(), "config.toml")
 }
 
+// APITokenPath is the file that holds the local API token. It is kept apart
+// from config.toml so the token can never leak through /api/config.
+func APITokenPath() string {
+	return filepath.Join(Dir(), "api.token")
+}
+
+// LoadAPIToken returns the local API token, creating it atomically on first
+// use. The token is written with mode 0600 inside the private config directory.
+func LoadAPIToken() (string, error) {
+	if err := os.MkdirAll(Dir(), 0o700); err != nil {
+		return "", fmt.Errorf("create config directory: %w", err)
+	}
+	path := APITokenPath()
+	for attempt := 0; attempt < 6; attempt++ {
+		data, err := os.ReadFile(path)
+		if err == nil {
+			token := strings.TrimSpace(string(data))
+			if len(token) >= 32 {
+				// Legacy files may be world-readable; tighten them on load.
+				_ = os.Chmod(path, 0o600)
+				return token, nil
+			}
+			// Another process may be in the middle of writing the file. After
+			// several attempts treat it as corrupt and regenerate it.
+			if attempt >= 4 {
+				if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+					return "", fmt.Errorf("remove invalid %s: %w", path, err)
+				}
+				continue
+			}
+			time.Sleep(20 * time.Millisecond)
+			continue
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("read %s: %w", path, err)
+		}
+
+		token, err := newAPIToken()
+		if err != nil {
+			return "", err
+		}
+		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		if err != nil {
+			if errors.Is(err, os.ErrExist) {
+				continue
+			}
+			return "", fmt.Errorf("create %s: %w", path, err)
+		}
+		_, werr := f.WriteString(token + "\n")
+		serr := f.Sync()
+		cerr := f.Close()
+		if werr != nil {
+			_ = os.Remove(path)
+			return "", fmt.Errorf("write %s: %w", path, werr)
+		}
+		if serr != nil {
+			return "", fmt.Errorf("sync %s: %w", path, serr)
+		}
+		if cerr != nil {
+			return "", fmt.Errorf("close %s: %w", path, cerr)
+		}
+		return token, nil
+	}
+	return "", fmt.Errorf("could not initialize %s (delete it and retry)", path)
+}
+
+func newAPIToken() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", fmt.Errorf("generate API token: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
 func RuntimeDir() string {
 	if dir := os.Getenv("XDG_RUNTIME_DIR"); dir != "" {
 		return filepath.Join(dir, "sawt-plus")
@@ -106,6 +227,10 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
+// Normalize fills in defaults for zero values so callers outside this package
+// can validate an incoming configuration before saving it.
+func (c *Config) Normalize() { c.normalize() }
+
 func (c *Config) normalize() {
 	def := Default()
 	if c.Audio.Rate <= 0 {
@@ -117,7 +242,7 @@ func (c *Config) normalize() {
 	if c.Audio.FrameMS <= 0 {
 		c.Audio.FrameMS = def.Audio.FrameMS
 	}
-	if c.Audio.Gain <= 0 {
+	if c.Audio.Gain < 0 {
 		c.Audio.Gain = def.Audio.Gain
 	}
 	if c.Audio.SourceName == "" {
@@ -138,17 +263,41 @@ func (c *Config) normalize() {
 }
 
 func (c *Config) Save() error {
-	if err := os.MkdirAll(Dir(), 0o700); err != nil {
+	dir := Dir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 	var b strings.Builder
 	if err := toml.NewEncoder(&b).Encode(c); err != nil {
 		return err
 	}
-	return os.WriteFile(Path(), []byte(b.String()), 0o600)
+	// Write to a private temporary file and rename it into place so a crash or
+	// power loss cannot leave a truncated config.toml (and lose pairing tokens).
+	f, err := os.CreateTemp(dir, ".config-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer func() { _ = os.Remove(tmp) }()
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if _, err := f.WriteString(b.String()); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp, Path())
 }
 
-func (c *Config) FrameBytes() int {
+func (c Config) FrameBytes() int {
 	return c.Audio.Rate * c.Audio.FrameMS / 1000 * c.Audio.Channels * 2
 }
 

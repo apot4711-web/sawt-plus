@@ -714,6 +714,7 @@ const I18N = {
     unmuted: "تم إلغاء الكتم",
     gainSet: "تم ضبط مستوى الصوت",
     daemonOffline: "انقطع الاتصال بالخادم. أعد تشغيله بالأمر: sawt daemon",
+    authRequired: "الواجهة تحتاج مفتاح الوصول. افتحها بالأمر: sawt web",
     monitorOn: "الاستماع مفعّل",
     monitorOff: "الاستماع متوقف",
     monitorUnsupported: "المتصفح لا يدعم تشغيل الصوت",
@@ -790,6 +791,7 @@ const I18N = {
     unmuted: "Unmuted",
     gainSet: "Input level updated",
     daemonOffline: "Lost contact with the daemon. Restart it with: sawt daemon",
+    authRequired: "This page needs the local access token. Open it with: sawt web",
     monitorOn: "Monitor on",
     monitorOff: "Monitor off",
     monitorUnsupported: "This browser cannot play audio",
@@ -1341,7 +1343,10 @@ renderMonitor();
 connectEvents();
 loadSaved();
 loadLogs();
-api("/api/status").then(renderStatus).catch(() => showBanner(t("daemonOffline")));
+api("/api/status").then(renderStatus).catch((err) => {
+  const unauthorized = err && /unauthorized/i.test(err.message || "");
+  showBanner(t(unauthorized ? "authRequired" : "daemonOffline"));
+});
 ui.uptimeTimer = setInterval(updateUptime, 1000);
 </script>
 </body>

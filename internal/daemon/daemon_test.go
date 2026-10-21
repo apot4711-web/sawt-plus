@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -120,5 +121,122 @@ func TestStreamFromFakePhone(t *testing.T) {
 	}
 	if status.Device != "Fake Phone" {
 		t.Fatalf("device = %q", status.Device)
+	}
+}
+
+func TestSubscribeCancelDuringBroadcast(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	d := New(config.Default())
+	defer d.Shutdown()
+
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				d.Log("info", "broadcast")
+			}
+		}
+	}()
+	for i := 0; i < 300; i++ {
+		_, cancel := d.Subscribe()
+		cancel()
+	}
+	close(done)
+}
+
+func TestFeedCancelDuringBroadcast(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	d := New(config.Default())
+	defer d.Shutdown()
+
+	done := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				d.broadcastPCM(make([]byte, 16))
+			}
+		}
+	}()
+	for i := 0; i < 300; i++ {
+		_, cancel := d.Feed()
+		cancel()
+	}
+	close(done)
+}
+
+func TestStartStreamAfterShutdown(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg := config.Default()
+	cfg.Devices = []config.DeviceEntry{{ID: "dev", Name: "Phone", Address: "192.168.1.10:8765"}}
+	d := New(cfg)
+	d.Shutdown()
+
+	if err := d.StartStream("Phone"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("StartStream after Shutdown = %v, want ErrClosed", err)
+	}
+}
+
+func TestResolveDeviceByNameAndID(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg := config.Default()
+	cfg.Devices = []config.DeviceEntry{{
+		ID: "dev-1", Name: "Phone A", Address: "192.168.1.10:8765", Token: "tok",
+	}}
+	d := New(cfg)
+	defer d.Shutdown()
+
+	for _, target := range []string{"Phone A", "dev-1"} {
+		entry, transport, err := d.ResolveDevice(target)
+		if err != nil {
+			t.Fatalf("ResolveDevice(%q): %v", target, err)
+		}
+		if transport != "wifi" {
+			t.Fatalf("transport = %q", transport)
+		}
+		if entry.Address != "192.168.1.10:8765" {
+			t.Fatalf("ResolveDevice(%q).Address = %q, want saved address", target, entry.Address)
+		}
+		if entry.ID != "dev-1" || entry.Token != "tok" {
+			t.Fatalf("ResolveDevice(%q) = %+v, want saved identity/token", target, entry)
+		}
+	}
+}
+
+func TestResolveDeviceByAddress(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg := config.Default()
+	cfg.Devices = []config.DeviceEntry{{ID: "dev-1", Name: "Phone A", Address: "192.168.1.10:8765"}}
+	d := New(cfg)
+	defer d.Shutdown()
+
+	entry, _, err := d.ResolveDevice("192.168.1.10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry.Address != "192.168.1.10:8765" || entry.ID != "dev-1" {
+		t.Fatalf("unexpected entry: %+v", entry)
+	}
+}
+
+func TestUnpairByName(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg := config.Default()
+	cfg.Devices = []config.DeviceEntry{{
+		ID: "dev-1", Name: "Phone A", Address: "192.168.1.10:8765", Token: "tok",
+	}}
+	d := New(cfg)
+	defer d.Shutdown()
+
+	if err := d.Unpair("Phone A"); err != nil {
+		t.Fatalf("Unpair by name: %v", err)
+	}
+	if got := d.SavedDevices(); len(got) != 0 {
+		t.Fatalf("device still saved: %+v", got)
 	}
 }

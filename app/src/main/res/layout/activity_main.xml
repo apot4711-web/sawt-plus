@@ -89,6 +89,17 @@
                             android:textAppearance="?attr/textAppearanceBodySmall"
                             android:textColor="?attr/colorOnSurfaceVariant" />
 
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/newCodeButton"
+                            style="@style/Widget.Material3.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="end"
+                            android:layout_marginTop="4dp"
+                            android:minHeight="0dp"
+                            android:text="@string/action_new_code"
+                            android:textAllCaps="false" />
+
                         <TextView
                             android:id="@+id/clientsView"
                             android:layout_width="match_parent"

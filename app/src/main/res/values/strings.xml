@@ -9,7 +9,10 @@
 
     <string name="pairing_label">PAIRING CODE</string>
     <string name="pairing_empty">—</string>
-    <string name="pairing_hint">Tap the address to copy · long-press the code</string>
+    <string name="pairing_hint">Tap the address to copy · long-press the code · use New code after a failed pairing</string>
+    <string name="action_new_code">New code</string>
+    <string name="code_refreshed">New pairing code generated</string>
+    <string name="code_requires_service">Start the service first</string>
     <string name="code_copied">Pairing code copied</string>
     <string name="address_label">Wi‑Fi address</string>
     <string name="address_copied">Address copied</string>

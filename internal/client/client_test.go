@@ -18,6 +18,10 @@ func TestStatus(t *testing.T) {
 			http.NotFound(w, r)
 			return
 		}
+		if got := r.Header.Get("Authorization"); got != "Bearer test-token" {
+			http.Error(w, "missing token", http.StatusUnauthorized)
+			return
+		}
 		_ = json.NewEncoder(w).Encode(daemon.Status{
 			State: daemon.StateStreaming,
 			Gain:  1.5,
@@ -26,7 +30,7 @@ func TestStatus(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := New(strings.TrimPrefix(srv.URL, "http://"))
+	c := New(strings.TrimPrefix(srv.URL, "http://"), "test-token")
 	if !c.Alive(context.Background()) {
 		t.Fatal("daemon should be alive")
 	}
@@ -46,7 +50,7 @@ func TestErrorResponse(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := New(strings.TrimPrefix(srv.URL, "http://"))
+	c := New(strings.TrimPrefix(srv.URL, "http://"), "test-token")
 	err := c.Connect(context.Background(), "")
 	if err == nil {
 		t.Fatal("expected an error")

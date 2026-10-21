@@ -48,6 +48,7 @@ const (
 var (
 	ErrPairRequired = errors.New("device requires pairing")
 	ErrNoDevice     = errors.New("no device selected")
+	ErrClosed       = errors.New("daemon is shut down")
 )
 
 type LogEntry struct {
@@ -88,6 +89,8 @@ type Daemon struct {
 	cfg     *config.Config
 	cfgPath string
 
+	cfgMu sync.RWMutex
+
 	mu         sync.RWMutex
 	status     Status
 	source     audioSource
@@ -104,6 +107,7 @@ type Daemon struct {
 	connMu       sync.Mutex
 	ws           *websocket.Conn
 	streamCancel context.CancelFunc
+	streamMu     sync.Mutex
 	wg           sync.WaitGroup
 
 	frames  atomic.Uint64
@@ -133,10 +137,14 @@ func New(cfg *config.Config) *Daemon {
 	}
 }
 
-func (d *Daemon) Config() *config.Config {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	return d.cfg
+// Config returns a snapshot of the configuration. Callers must not keep the
+// pointer, and secrets (device tokens) are included only for internal use.
+func (d *Daemon) Config() config.Config {
+	d.cfgMu.RLock()
+	defer d.cfgMu.RUnlock()
+	out := *d.cfg
+	out.Devices = append([]config.DeviceEntry(nil), d.cfg.Devices...)
+	return out
 }
 
 // SavedDevice is a device entry without the pairing token, safe to expose to
@@ -148,8 +156,8 @@ type SavedDevice struct {
 }
 
 func (d *Daemon) SavedDevices() []SavedDevice {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
+	d.cfgMu.RLock()
+	defer d.cfgMu.RUnlock()
 	out := make([]SavedDevice, 0, len(d.cfg.Devices))
 	for _, dev := range d.cfg.Devices {
 		out = append(out, SavedDevice{ID: dev.ID, Name: dev.Name, Address: dev.Address})
@@ -160,27 +168,26 @@ func (d *Daemon) SavedDevices() []SavedDevice {
 func (d *Daemon) Context() context.Context { return d.baseCtx }
 
 func (d *Daemon) Status() Status {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	s := d.status
-	s.Gain = d.cfg.Audio.Gain
-	s.Mute = d.cfg.Audio.Mute
-	s.Frames = d.frames.Load()
-	s.Bytes = d.bytes.Load()
-	s.Dropped = d.dropped.Load() + d.sourceDropped()
-	s.RTTMS = d.rtt.Load()
-	return s
-}
+	d.cfgMu.RLock()
+	gain := d.cfg.Audio.Gain
+	mute := d.cfg.Audio.Mute
+	d.cfgMu.RUnlock()
 
-func (d *Daemon) sourceDropped() uint64 {
 	d.mu.RLock()
+	s := d.status
 	src := d.source
 	d.mu.RUnlock()
-	if src == nil {
-		return 0
+	s.Gain = gain
+	s.Mute = mute
+	s.Frames = d.frames.Load()
+	s.Bytes = d.bytes.Load()
+	s.Dropped = d.dropped.Load()
+	if src != nil {
+		_, dropped, _ := src.Stats()
+		s.Dropped += dropped
 	}
-	_, dropped, _ := src.Stats()
-	return dropped
+	s.RTTMS = d.rtt.Load()
+	return s
 }
 
 func (d *Daemon) Logs() []LogEntry {
@@ -220,13 +227,12 @@ func (d *Daemon) broadcastStatus() {
 }
 
 func (d *Daemon) broadcast(ev Event) {
+	// Sends are non-blocking, so holding the read lock for the duration keeps
+	// unsubscribe/Shutdown (which need the write lock to close a channel) from
+	// closing a channel between the lookup and the send.
 	d.mu.RLock()
-	subs := make([]chan Event, 0, len(d.subs))
+	defer d.mu.RUnlock()
 	for ch := range d.subs {
-		subs = append(subs, ch)
-	}
-	d.mu.RUnlock()
-	for _, ch := range subs {
 		select {
 		case ch <- ev:
 		default:
@@ -237,14 +243,19 @@ func (d *Daemon) broadcast(ev Event) {
 func (d *Daemon) Subscribe() (<-chan Event, func()) {
 	ch := make(chan Event, 64)
 	d.mu.Lock()
+	if d.closed {
+		d.mu.Unlock()
+		close(ch)
+		return ch, func() {}
+	}
 	d.subs[ch] = struct{}{}
 	d.mu.Unlock()
 	return ch, func() {
+		// Unregister only. Closing the channel here would race with broadcast,
+		// which may already be sending on it. Shutdown closes every remaining
+		// channel after all producers have stopped.
 		d.mu.Lock()
-		if _, ok := d.subs[ch]; ok {
-			delete(d.subs, ch)
-			close(ch)
-		}
+		delete(d.subs, ch)
 		d.mu.Unlock()
 	}
 }
@@ -253,26 +264,24 @@ func (d *Daemon) Subscribe() (<-chan Event, func()) {
 func (d *Daemon) Feed() (<-chan []byte, func()) {
 	ch := make(chan []byte, 16)
 	d.mu.Lock()
+	if d.closed {
+		d.mu.Unlock()
+		close(ch)
+		return ch, func() {}
+	}
 	d.feeds[ch] = struct{}{}
 	d.mu.Unlock()
 	return ch, func() {
 		d.mu.Lock()
-		if _, ok := d.feeds[ch]; ok {
-			delete(d.feeds, ch)
-			close(ch)
-		}
+		delete(d.feeds, ch)
 		d.mu.Unlock()
 	}
 }
 
 func (d *Daemon) broadcastPCM(pcm []byte) {
 	d.mu.RLock()
-	feeds := make([]chan []byte, 0, len(d.feeds))
+	defer d.mu.RUnlock()
 	for ch := range d.feeds {
-		feeds = append(feeds, ch)
-	}
-	d.mu.RUnlock()
-	for _, ch := range feeds {
 		frame := append([]byte(nil), pcm...)
 		select {
 		case ch <- frame:
@@ -349,8 +358,11 @@ func (d *Daemon) ensureSource(ctx context.Context) (audioSource, error) {
 		d.mu.Unlock()
 		return src, nil
 	}
-	cfg := d.cfg.Audio
 	d.mu.Unlock()
+
+	d.cfgMu.RLock()
+	cfg := d.cfg.Audio
+	d.cfgMu.RUnlock()
 
 	src, err := audio.NewSource(cfg)
 	if err != nil {
@@ -391,17 +403,17 @@ func (d *Daemon) SetGain(gain float64) {
 	if gain > 8 {
 		gain = 8
 	}
-	d.mu.Lock()
+	d.cfgMu.Lock()
 	d.cfg.Audio.Gain = gain
-	d.mu.Unlock()
+	d.cfgMu.Unlock()
 	d.Log("info", "gain set to %.2fx", gain)
 	d.broadcastStatus()
 }
 
 func (d *Daemon) SetMute(mute bool) {
-	d.mu.Lock()
+	d.cfgMu.Lock()
 	d.cfg.Audio.Mute = mute
-	d.mu.Unlock()
+	d.cfgMu.Unlock()
 	if mute {
 		d.Log("info", "microphone muted")
 	} else {
@@ -413,14 +425,16 @@ func (d *Daemon) SetMute(mute bool) {
 func (d *Daemon) ResolveDevice(target string) (config.DeviceEntry, string, error) {
 	d.mu.RLock()
 	last := d.lastTarget
-	cfg := d.cfg
 	d.mu.RUnlock()
 
 	if target == "" {
 		target = last
 	}
-	if target == "" && len(cfg.Devices) == 1 {
-		target = cfg.Devices[0].Address
+	if target == "" {
+		saved := d.SavedDevices()
+		if len(saved) == 1 {
+			target = saved[0].Address
+		}
 	}
 	if target == "" {
 		return config.DeviceEntry{}, "", ErrNoDevice
@@ -430,14 +444,21 @@ func (d *Daemon) ResolveDevice(target string) (config.DeviceEntry, string, error
 		return config.DeviceEntry{Address: target, Name: "ADB " + serial, ID: target}, "adb", nil
 	}
 	addr := config.NormalizeAddress(target)
-	entry, ok := cfg.FindDevice(target)
+	d.cfgMu.RLock()
+	entry, ok := d.cfg.FindDevice(target)
 	if !ok {
-		entry, ok = cfg.FindDevice(addr)
+		entry, ok = d.cfg.FindDevice(addr)
 	}
+	d.cfgMu.RUnlock()
 	if !ok {
-		entry = config.DeviceEntry{Address: addr}
+		return config.DeviceEntry{Address: addr}, "wifi", nil
 	}
-	entry.Address = addr
+	// A saved device may be addressed by name or ID. Only replace its stored
+	// address when the target itself is a network address, otherwise a name
+	// such as "Phone A" would be normalized into "PhoneA:8765".
+	if strings.Contains(target, ":") {
+		entry.Address = addr
+	}
 	return entry, "wifi", nil
 }
 
@@ -446,16 +467,39 @@ func (d *Daemon) StartStream(target string) error {
 	if err != nil {
 		return err
 	}
-	if transport == "adb" {
-		d.Disconnect()
-		d.mu.Lock()
-		d.lastTarget = target
+
+	// Serialize stream starts so two concurrent requests cannot overwrite each
+	// other's streamCancel and leave an uncancelled reconnect loop behind.
+	d.streamMu.Lock()
+	defer d.streamMu.Unlock()
+
+	d.Disconnect()
+
+	ctx, cancel := context.WithCancel(d.baseCtx)
+
+	// Add to the wait group under d.mu: Shutdown sets closed under the same
+	// lock before waiting, so Add can never race with Wait.
+	d.mu.Lock()
+	if d.closed {
 		d.mu.Unlock()
-		ctx, cancel := context.WithCancel(d.baseCtx)
-		d.connMu.Lock()
-		d.streamCancel = cancel
-		d.connMu.Unlock()
-		d.wg.Add(1)
+		cancel()
+		return ErrClosed
+	}
+	d.lastTarget = entry.Address
+	if transport != "adb" {
+		d.status.Device = entry.Name
+		d.status.DeviceID = entry.ID
+		d.status.Address = entry.Address
+		d.status.Transport = "wifi"
+	}
+	d.wg.Add(1)
+	d.mu.Unlock()
+
+	d.connMu.Lock()
+	d.streamCancel = cancel
+	d.connMu.Unlock()
+
+	if transport == "adb" {
 		go func() {
 			defer d.wg.Done()
 			d.adbLoop(ctx, entry.Address)
@@ -463,20 +507,6 @@ func (d *Daemon) StartStream(target string) error {
 		return nil
 	}
 
-	d.Disconnect()
-	d.mu.Lock()
-	d.lastTarget = entry.Address
-	d.status.Device = entry.Name
-	d.status.DeviceID = entry.ID
-	d.status.Address = entry.Address
-	d.status.Transport = "wifi"
-	d.mu.Unlock()
-
-	ctx, cancel := context.WithCancel(d.baseCtx)
-	d.connMu.Lock()
-	d.streamCancel = cancel
-	d.connMu.Unlock()
-	d.wg.Add(1)
 	go func() {
 		defer d.wg.Done()
 		d.wifiLoop(ctx, entry)
@@ -502,6 +532,7 @@ func (d *Daemon) Disconnect() {
 
 func (d *Daemon) wifiLoop(ctx context.Context, entry config.DeviceEntry) {
 	backoff := time.Second
+	failures := 0
 	for {
 		if ctx.Err() != nil {
 			return
@@ -516,11 +547,23 @@ func (d *Daemon) wifiLoop(ctx context.Context, entry config.DeviceEntry) {
 			return
 		}
 		if err != nil {
+			failures++
 			d.Log("error", "%v", err)
 			d.setState(StateError, err)
+		} else {
+			failures = 0
 		}
 		if !d.Config().Daemon.Reconnect {
 			return
+		}
+		// A changed DHCP lease leaves the saved IP stale. After a few failed
+		// attempts, look the phone up again by ID/name and retry immediately.
+		if failures >= 3 {
+			if d.rediscover(ctx, &entry) {
+				failures = 0
+				backoff = time.Second
+				continue
+			}
 		}
 		d.Log("info", "reconnecting in %s", backoff)
 		select {
@@ -532,6 +575,50 @@ func (d *Daemon) wifiLoop(ctx context.Context, entry config.DeviceEntry) {
 			backoff *= 2
 		}
 	}
+}
+
+// rediscover refreshes a saved device's address after the phone's DHCP lease
+// changes. It matches by stable ID first and by name as a fallback.
+func (d *Daemon) rediscover(ctx context.Context, entry *config.DeviceEntry) bool {
+	if entry.ID == "" && entry.Name == "" {
+		return false
+	}
+	browseCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	devices, err := discovery.Browse(browseCtx, 3*time.Second)
+	if err != nil && len(devices) == 0 {
+		return false
+	}
+	for _, dev := range devices {
+		if dev.Transport == "adb" || dev.Address == "" {
+			continue
+		}
+		matched := (entry.ID != "" && dev.ID == entry.ID) ||
+			(entry.Name != "" && dev.Name == entry.Name)
+		if !matched {
+			continue
+		}
+		addr := config.NormalizeAddress(dev.Address)
+		if addr == "" || addr == entry.Address {
+			return false
+		}
+		oldAddr := entry.Address
+		entry.Address = addr
+		entry.ID = firstNonEmpty(dev.ID, entry.ID)
+		entry.Name = firstNonEmpty(entry.Name, dev.Name)
+
+		d.cfgMu.Lock()
+		d.cfg.RemoveDevice(oldAddr)
+		d.cfg.UpsertDevice(*entry)
+		saveErr := d.cfg.Save()
+		d.cfgMu.Unlock()
+		if saveErr != nil {
+			d.Log("warn", "save rediscovered address: %v", saveErr)
+		}
+		d.Log("info", "rediscovered %s at %s", firstNonEmpty(entry.Name, entry.ID), addr)
+		return true
+	}
+	return false
 }
 
 func (d *Daemon) streamWiFi(ctx context.Context, entry config.DeviceEntry) error {
@@ -580,10 +667,10 @@ func (d *Daemon) streamWiFi(ctx context.Context, entry config.DeviceEntry) error
 	entry.Name = firstNonEmpty(msg.Name, entry.Name, addr)
 	entry.ID = firstNonEmpty(msg.ID, entry.ID)
 	entry.Address = addr
-	d.cfg.UpsertDevice(entry)
-	_ = d.cfg.Save()
 
 	rate, channels, frameMS := msg.Rate, msg.Channels, msg.FrameMS
+	d.cfgMu.Lock()
+	d.cfg.UpsertDevice(entry)
 	if rate <= 0 {
 		rate = d.cfg.Audio.Rate
 	}
@@ -593,10 +680,16 @@ func (d *Daemon) streamWiFi(ctx context.Context, entry config.DeviceEntry) error
 	if frameMS <= 0 {
 		frameMS = d.cfg.Audio.FrameMS
 	}
-	d.mu.Lock()
 	d.cfg.Audio.Rate = rate
 	d.cfg.Audio.Channels = channels
 	d.cfg.Audio.FrameMS = frameMS
+	saveErr := d.cfg.Save()
+	d.cfgMu.Unlock()
+	if saveErr != nil {
+		d.Log("warn", "save config: %v", saveErr)
+	}
+
+	d.mu.Lock()
 	d.status.Device = entry.Name
 	d.status.DeviceID = entry.ID
 	d.status.Address = entry.Address
@@ -614,11 +707,14 @@ func (d *Daemon) streamWiFi(ctx context.Context, entry config.DeviceEntry) error
 	d.Log("info", "streaming from %s (%d Hz, %d ch)", entry.Name, rate, channels)
 
 	pingCtx, pingCancel := context.WithCancel(ctx)
-	defer pingCancel()
-	d.wg.Add(1)
+	pingDone := make(chan struct{})
 	go func() {
-		defer d.wg.Done()
+		defer close(pingDone)
 		d.pingLoop(pingCtx, ws)
+	}()
+	defer func() {
+		pingCancel()
+		<-pingDone
 	}()
 
 	return d.readStream(ctx, ws)
@@ -716,9 +812,12 @@ func (d *Daemon) ProcessPCM(pcm []byte) {
 	if len(pcm) == 0 {
 		return
 	}
-	d.mu.RLock()
+	d.cfgMu.RLock()
 	gain := d.cfg.Audio.Gain
 	mute := d.cfg.Audio.Mute
+	d.cfgMu.RUnlock()
+
+	d.mu.RLock()
 	src := d.source
 	d.mu.RUnlock()
 
@@ -758,14 +857,21 @@ func (d *Daemon) Unpair(target string) error {
 		d.Disconnect()
 	}
 
+	d.cfgMu.Lock()
 	removed := d.cfg.RemoveDevice(entry.Address)
 	if entry.ID != "" {
 		removed = d.cfg.RemoveDevice(entry.ID) || removed
 	}
+	if entry.Name != "" {
+		removed = d.cfg.RemoveDevice(entry.Name) || removed
+	}
 	if !removed {
+		d.cfgMu.Unlock()
 		return fmt.Errorf("no saved pairing for %s", entry.Address)
 	}
-	if err := d.cfg.Save(); err != nil {
+	err = d.cfg.Save()
+	d.cfgMu.Unlock()
+	if err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
 
@@ -838,9 +944,12 @@ func (d *Daemon) Pair(ctx context.Context, target, code string) (config.DeviceEn
 		entry.Name = firstNonEmpty(reply.Name, entry.Name, addr)
 		entry.ID = firstNonEmpty(reply.ID, entry.ID)
 		entry.Address = addr
+		d.cfgMu.Lock()
 		d.cfg.UpsertDevice(entry)
-		if err := d.cfg.Save(); err != nil {
-			return entry, fmt.Errorf("save config: %w", err)
+		saveErr := d.cfg.Save()
+		d.cfgMu.Unlock()
+		if saveErr != nil {
+			return entry, fmt.Errorf("save config: %w", saveErr)
 		}
 		d.setState(StateIdle, nil)
 		d.Log("info", "paired with %s", entry.Name)
@@ -939,10 +1048,11 @@ func (d *Daemon) streamADB(ctx context.Context, serial string) error {
 
 // StartAutoConnect connects to the first saved device with a token.
 func (d *Daemon) StartAutoConnect() {
-	if !d.Config().Daemon.AutoConnect {
+	cfg := d.Config()
+	if !cfg.Daemon.AutoConnect {
 		return
 	}
-	for _, dev := range d.Config().Devices {
+	for _, dev := range cfg.Devices {
 		if dev.Token != "" {
 			d.Log("info", "auto-connecting to %s", firstNonEmpty(dev.Name, dev.Address))
 			if err := d.StartStream(dev.Address); err != nil {
@@ -999,10 +1109,27 @@ func firstNonZero(values ...int) int {
 
 // SaveConfig persists the current configuration.
 func (d *Daemon) SaveConfig() error {
-	d.mu.RLock()
-	cfg := *d.cfg
-	d.mu.RUnlock()
-	return cfg.Save()
+	d.cfgMu.Lock()
+	defer d.cfgMu.Unlock()
+	return d.cfg.Save()
+}
+
+// UpdateConfig applies user-editable settings. Pairing tokens and the saved
+// device list are intentionally preserved: the API never accepts secrets.
+func (d *Daemon) UpdateConfig(incoming config.Config) error {
+	incoming.Devices = nil
+	incoming.Normalize()
+
+	d.cfgMu.Lock()
+	defer d.cfgMu.Unlock()
+	if incoming.Daemon.WebAddr != d.cfg.Daemon.WebAddr {
+		return errors.New("web_addr cannot be changed while the daemon is running; edit config.toml and restart the daemon")
+	}
+	d.cfg.Audio = incoming.Audio
+	d.cfg.Daemon.AutoConnect = incoming.Daemon.AutoConnect
+	d.cfg.Daemon.Reconnect = incoming.Daemon.Reconnect
+	d.cfg.UI = incoming.UI
+	return d.cfg.Save()
 }
 
 func (d *Daemon) ConfigPath() string { return config.Path() }

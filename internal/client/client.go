@@ -18,22 +18,33 @@ import (
 )
 
 type Client struct {
-	base string
-	http *http.Client
+	base  string
+	token string
+	http  *http.Client
 }
 
-// New returns a client for a daemon listening on addr (host:port).
-func New(addr string) *Client {
+// New returns a client for a daemon listening on addr (host:port). token is
+// the local API token read from the config directory.
+func New(addr, token string) *Client {
 	addr = strings.TrimPrefix(addr, "http://")
 	addr = strings.TrimPrefix(addr, "https://")
 	addr = strings.TrimSuffix(addr, "/")
 	return &Client{
-		base: "http://" + addr,
-		http: &http.Client{Timeout: 60 * time.Second},
+		base:  "http://" + addr,
+		token: token,
+		http:  &http.Client{Timeout: 60 * time.Second},
 	}
 }
 
 func (c *Client) Addr() string { return strings.TrimPrefix(c.base, "http://") }
+
+func (c *Client) Token() string { return c.token }
+
+func (c *Client) authorize(req *http.Request) {
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+}
 
 type Error struct {
 	Status  int
@@ -54,6 +65,7 @@ func (c *Client) Alive(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
+	c.authorize(req)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return false
@@ -78,6 +90,7 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 	if in != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	c.authorize(req)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return fmt.Errorf("cannot reach daemon at %s: %w", c.Addr(), err)
