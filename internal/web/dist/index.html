@@ -1244,7 +1244,9 @@ const ui = {
   uptimeTimer: null,
   dialog: null,
   lastFocus: null,
-  activeKey: ""
+  activeKey: "",
+  activityKey: "",
+  pollTimer: null
 };
 
 function applyLanguage() {
@@ -1337,21 +1339,45 @@ function autoConnectEnabled() {
   return !!(ui.config && ui.config.Daemon && ui.config.Daemon.AutoConnect);
 }
 
+function normalizeAddr(addr) {
+  let value = String(addr || "").trim();
+  if (!value) return "";
+  value = value.replace(/^wss?:\/\//i, "");
+  value = value.replace(/\s+/g, "");
+  value = value.replace(/\/+$/, "");
+  if (value && !value.includes(":")) value += ":8765";
+  return value;
+}
+
 function sameDevice(a, b) {
   if (!a || !b) return false;
-  if (a.address && b.address && a.address === b.address) return true;
+  const aAddr = normalizeAddr(a.address);
+  const bAddr = normalizeAddr(b.address);
+  if (aAddr && bAddr && aAddr === bAddr) return true;
   return !!(a.id && b.id && a.id === b.id);
+}
+
+function frameIsRecent(st) {
+  if (!st) return false;
+  if (st.active) return true;
+  const last = st.last_frame_at ? Date.parse(st.last_frame_at) : 0;
+  return Number.isFinite(last) && last > 0 && Date.now() - last <= 3000;
 }
 
 function activeDevice() {
   const st = ui.status;
-  if (!st || !st.address) return null;
-  if (!["streaming", "connecting", "pairing"].includes(st.state)) return null;
+  if (!st) return null;
+  const recent = frameIsRecent(st);
+  const savedActive = ui.saved.find((dev) => dev && dev.active);
+  const pending = ["connecting", "pairing"].includes(st.state);
+  if (!recent && !savedActive && !pending) return null;
+  if (!st.address && !savedActive) return null;
+  const fallback = savedActive || {};
   return {
-    id: st.device_id || "",
-    name: st.device || st.address,
-    address: st.address,
-    transport: st.transport || "wifi",
+    id: st.device_id || fallback.id || "",
+    name: st.device || fallback.name || st.address || fallback.address,
+    address: st.address || fallback.address,
+    transport: st.transport || fallback.transport || "wifi",
     kind: "active",
     state: st.state
   };
@@ -1493,10 +1519,20 @@ function renderStatus(st) {
   updateUptime();
 }
 
+function refreshActivity() {
+  const active = activeDevice();
+  const key = active ? [active.address || "", active.id || "", active.state || ""].join("|") : "";
+  if (key !== ui.activityKey) {
+    ui.activityKey = key;
+    renderDevices();
+  }
+}
+
 function updateUptime() {
   if (ui.status && ui.status.since) {
     $("uptimeText").textContent = formatUptime(ui.status.since);
   }
+  refreshActivity();
 }
 
 function renderDevices() {
@@ -1852,14 +1888,35 @@ function stopMonitor() {
   renderMonitor();
 }
 
+function stopPolling() {
+  if (ui.pollTimer) {
+    clearInterval(ui.pollTimer);
+    ui.pollTimer = null;
+  }
+}
+
+function startPolling() {
+  if (ui.pollTimer) return;
+  const poll = async () => {
+    try {
+      renderStatus(await api("/api/status"));
+      await loadSaved();
+    } catch (_) {}
+  };
+  poll();
+  ui.pollTimer = setInterval(poll, 2000);
+}
+
 function connectEvents() {
   const source = new EventSource("/api/events");
   source.onopen = () => {
     $("connBadge").classList.remove("offline");
+    stopPolling();
   };
   source.onerror = () => {
     $("connBadge").classList.add("offline");
     showBanner(t("daemonOffline"));
+    startPolling();
   };
   source.onmessage = (event) => {
     let data;

@@ -58,24 +58,26 @@ type LogEntry struct {
 }
 
 type Status struct {
-	State     State     `json:"state"`
-	Device    string    `json:"device"`
-	DeviceID  string    `json:"device_id"`
-	Address   string    `json:"address"`
-	Transport string    `json:"transport"`
-	Source    string    `json:"source"`
-	Rate      int       `json:"rate"`
-	Channels  int       `json:"channels"`
-	FrameMS   int       `json:"frame_ms"`
-	Clients   int       `json:"clients"`
-	RTTMS     int64     `json:"rtt_ms"`
-	Frames    uint64    `json:"frames"`
-	Bytes     uint64    `json:"bytes"`
-	Dropped   uint64    `json:"dropped"`
-	Gain      float64   `json:"gain"`
-	Mute      bool      `json:"mute"`
-	Since     time.Time `json:"since"`
-	Error     string    `json:"error,omitempty"`
+	State       State     `json:"state"`
+	Device      string    `json:"device"`
+	DeviceID    string    `json:"device_id"`
+	Address     string    `json:"address"`
+	Transport   string    `json:"transport"`
+	Source      string    `json:"source"`
+	Rate        int       `json:"rate"`
+	Channels    int       `json:"channels"`
+	FrameMS     int       `json:"frame_ms"`
+	Clients     int       `json:"clients"`
+	RTTMS       int64     `json:"rtt_ms"`
+	Frames      uint64    `json:"frames"`
+	Bytes       uint64    `json:"bytes"`
+	Dropped     uint64    `json:"dropped"`
+	Gain        float64   `json:"gain"`
+	Mute        bool      `json:"mute"`
+	Since       time.Time `json:"since"`
+	LastFrameAt time.Time `json:"last_frame_at"`
+	Active      bool      `json:"active"`
+	Error       string    `json:"error,omitempty"`
 }
 
 type Event struct {
@@ -153,14 +155,33 @@ type SavedDevice struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
 	Address string `json:"address"`
+	Active  bool   `json:"active"`
 }
 
+// activeWindow is how long a device keeps counting as active after its last
+// PCM frame. It tolerates small gaps (jitter, scheduling) without keeping the
+// UI marked active long after the stream stopped.
+const activeWindow = 3 * time.Second
+
 func (d *Daemon) SavedDevices() []SavedDevice {
+	// Status() snapshots the current device and active window before taking the
+	// config lock, so the two locks are never held at the same time.
+	st := d.Status()
+	activeAddr := config.NormalizeAddress(st.Address)
+
 	d.cfgMu.RLock()
 	defer d.cfgMu.RUnlock()
 	out := make([]SavedDevice, 0, len(d.cfg.Devices))
 	for _, dev := range d.cfg.Devices {
-		out = append(out, SavedDevice{ID: dev.ID, Name: dev.Name, Address: dev.Address})
+		active := st.Active &&
+			((dev.ID != "" && dev.ID == st.DeviceID) ||
+				(activeAddr != "" && config.NormalizeAddress(dev.Address) == activeAddr))
+		out = append(out, SavedDevice{
+			ID:      dev.ID,
+			Name:    dev.Name,
+			Address: dev.Address,
+			Active:  active,
+		})
 	}
 	return out
 }
@@ -187,6 +208,7 @@ func (d *Daemon) Status() Status {
 		s.Dropped += dropped
 	}
 	s.RTTMS = d.rtt.Load()
+	s.Active = !s.LastFrameAt.IsZero() && time.Since(s.LastFrameAt) <= activeWindow
 	return s
 }
 
@@ -812,6 +834,10 @@ func (d *Daemon) ProcessPCM(pcm []byte) {
 	if len(pcm) == 0 {
 		return
 	}
+	d.mu.Lock()
+	d.status.LastFrameAt = time.Now()
+	d.mu.Unlock()
+
 	d.cfgMu.RLock()
 	gain := d.cfg.Audio.Gain
 	mute := d.cfg.Audio.Mute
