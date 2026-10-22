@@ -10,15 +10,18 @@
       color-scheme: light dark;
       --primary: #6750a4;
       --on-primary: #ffffff;
-      --primary-container: #eadcff;
+      --primary-container: #eaddff;
       --on-primary-container: #21005d;
       --secondary-container: #e8def8;
       --on-secondary-container: #1d192b;
+      --tertiary-container: #ffd8e4;
+      --on-tertiary-container: #31111d;
       --surface: #fef7ff;
-      --surface-1: #f7f2fa;
-      --surface-2: #f3edf7;
-      --surface-3: #ece6f0;
-      --surface-4: #e6e0e9;
+      --surface-container-lowest: #ffffff;
+      --surface-container-low: #f7f2fa;
+      --surface-container: #f3edf7;
+      --surface-container-high: #ece6f0;
+      --surface-container-highest: #e6e0e9;
       --inverse-surface: #322f35;
       --inverse-on-surface: #f5eff7;
       --on-surface: #1d1b20;
@@ -32,10 +35,16 @@
       --ok-container: #c4eed0;
       --warn: #7d5700;
       --warn-container: #ffdfa0;
-      --shadow: 0 1px 2px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.05);
-      --radius: 24px;
-      --radius-sm: 16px;
-      --field-bg: var(--surface-2);
+      --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.18), 0 1px 3px 1px rgba(0, 0, 0, 0.08);
+      --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.18), 0 2px 6px 2px rgba(0, 0, 0, 0.08);
+      --shadow-3: 0 4px 8px 3px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.22);
+      --radius-xl: 28px;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --ease: cubic-bezier(0.2, 0, 0, 1);
+      --duration: 180ms;
+      --field-bg: var(--surface-container-lowest);
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -45,11 +54,14 @@
         --on-primary-container: #eaddff;
         --secondary-container: #4a4458;
         --on-secondary-container: #e8def8;
+        --tertiary-container: #633b48;
+        --on-tertiary-container: #ffd8e4;
         --surface: #141218;
-        --surface-1: #1d1b20;
-        --surface-2: #211f26;
-        --surface-3: #2b2930;
-        --surface-4: #36343b;
+        --surface-container-lowest: #0f0d13;
+        --surface-container-low: #1d1b20;
+        --surface-container: #211f26;
+        --surface-container-high: #2b2930;
+        --surface-container-highest: #36343b;
         --inverse-surface: #e6e0e9;
         --inverse-on-surface: #322f35;
         --on-surface: #e6e0e9;
@@ -63,21 +75,32 @@
         --ok-container: #0a3d1b;
         --warn: #ffb951;
         --warn-container: #3f2d00;
-        --shadow: none;
+        --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45);
+        --shadow-2: 0 2px 8px rgba(0, 0, 0, 0.5);
+        --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.65);
       }
     }
     * { box-sizing: border-box; }
     html, body { min-height: 100%; }
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif;
+      font-family: "Roboto", "Noto Sans Arabic", "Noto Sans", system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
       background: var(--surface);
       color: var(--on-surface);
       -webkit-font-smoothing: antialiased;
       line-height: 1.5;
     }
+    body.dialog-open { overflow: hidden; }
     button, input { font: inherit; color: inherit; }
     h1, h2, h3, p { margin: 0; }
+    [hidden], .hidden { display: none !important; }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      direction: ltr;
+      text-align: start;
+    }
+    .icon { width: 24px; height: 24px; fill: currentColor; flex: none; }
+    .svg-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 
     .app-bar {
       position: sticky;
@@ -89,23 +112,24 @@
       gap: 16px;
       min-height: 64px;
       padding: 8px clamp(16px, 4vw, 40px);
-      background: var(--surface);
-      box-shadow: 0 1px 0 var(--outline-variant);
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      box-shadow: var(--shadow-1);
+      backdrop-filter: blur(18px);
     }
     .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
     .brand-icon {
-      width: 40px;
-      height: 40px;
+      width: 44px;
+      height: 44px;
       flex: none;
       display: grid;
       place-items: center;
-      border-radius: 12px;
+      border-radius: 14px;
       background: var(--primary-container);
       color: var(--on-primary-container);
     }
-    .brand-icon svg { width: 22px; height: 22px; }
-    .brand h1 { font-size: 17px; font-weight: 600; letter-spacing: 0.01em; }
-    .brand p { font-size: 12px; color: var(--on-surface-variant); }
+    .brand-icon .icon { width: 24px; height: 24px; }
+    .brand h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.01em; line-height: 1.2; }
+    .brand p { font-size: 12px; color: var(--on-surface-variant); margin-top: 2px; }
     .app-actions { display: flex; align-items: center; gap: 8px; }
 
     .state-chip {
@@ -114,12 +138,14 @@
       gap: 8px;
       height: 32px;
       padding: 0 12px;
-      border-radius: 8px;
-      background: var(--surface-3);
+      border: 1px solid var(--outline-variant);
+      border-radius: 999px;
+      background: var(--surface-container-high);
       color: var(--on-surface-variant);
       font-size: 12px;
       font-weight: 600;
       white-space: nowrap;
+      transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
     }
     .state-chip::before {
       content: "";
@@ -128,11 +154,11 @@
       border-radius: 50%;
       background: currentColor;
     }
-    .state-chip[data-state="streaming"] { background: var(--ok-container); color: var(--ok); }
+    .state-chip[data-state="streaming"] { background: var(--ok-container); color: var(--ok); border-color: transparent; }
     .state-chip[data-state="connecting"],
-    .state-chip[data-state="discovering"] { background: var(--warn-container); color: var(--warn); }
-    .state-chip[data-state="pairing"] { background: var(--primary-container); color: var(--on-primary-container); }
-    .state-chip[data-state="error"] { background: var(--error-container); color: var(--on-error-container); }
+    .state-chip[data-state="discovering"] { background: var(--warn-container); color: var(--warn); border-color: transparent; }
+    .state-chip[data-state="pairing"] { background: var(--primary-container); color: var(--on-primary-container); border-color: transparent; }
+    .state-chip[data-state="error"] { background: var(--error-container); color: var(--on-error-container); border-color: transparent; }
     .state-chip.offline { opacity: 0.6; }
 
     .icon-btn {
@@ -147,8 +173,10 @@
       font-size: 13px;
       font-weight: 700;
       cursor: pointer;
+      transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
     }
-    .icon-btn:hover { background: var(--surface-3); }
+    .icon-btn:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+    .icon-btn:active { background: color-mix(in srgb, currentColor 12%, transparent); }
 
     .shell {
       max-width: 1120px;
@@ -156,7 +184,7 @@
       padding: clamp(16px, 3vw, 28px) clamp(16px, 4vw, 40px) 40px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 20px;
     }
 
     .banner {
@@ -165,10 +193,11 @@
       justify-content: space-between;
       gap: 12px;
       padding: 14px 18px;
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-md);
       background: var(--error-container);
       color: var(--on-error-container);
       font-size: 14px;
+      box-shadow: var(--shadow-1);
     }
     .banner.hidden { display: none; }
     .banner button {
@@ -180,34 +209,36 @@
       cursor: pointer;
     }
 
-    .hero, .live-grid { display: grid; gap: 16px; }
-    .hero { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); }
-    .live-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .live-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 
     .card {
-      background: var(--surface-2);
-      border-radius: var(--radius);
-      padding: 20px;
-      box-shadow: var(--shadow);
+      background: var(--surface-container-low);
+      border-radius: var(--radius-xl);
+      padding: clamp(18px, 3vw, 26px);
+      box-shadow: var(--shadow-1);
       min-width: 0;
     }
     .card-head {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 16px;
+      gap: 14px;
+      margin-bottom: 18px;
     }
-    .card h2 {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: 0.005em;
+    .card-heading { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .section-icon {
+      width: 48px;
+      height: 48px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      background: var(--primary-container);
+      color: var(--on-primary-container);
     }
-    .card-sub {
-      font-size: 13px;
-      color: var(--on-surface-variant);
-      margin-top: 2px;
-    }
+    .section-icon .icon { width: 24px; height: 24px; }
+    .card h2 { font-size: 20px; font-weight: 600; letter-spacing: 0.005em; line-height: 1.3; }
+    .card-sub { font-size: 13px; color: var(--on-surface-variant); margin-top: 2px; }
 
     .field { position: relative; margin-top: 20px; }
     .field input {
@@ -215,11 +246,12 @@
       height: 56px;
       padding: 0 16px;
       border: 1px solid var(--outline);
-      border-radius: 4px;
-      background: transparent;
+      border-radius: var(--radius-sm);
+      background: var(--field-bg);
       outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
+      transition: border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease), background var(--duration) var(--ease);
     }
+    .field input:hover { background: color-mix(in srgb, var(--on-surface) 3%, var(--field-bg)); }
     .field label {
       position: absolute;
       inset-inline-start: 12px;
@@ -230,7 +262,7 @@
       color: var(--on-surface-variant);
       font-size: 16px;
       pointer-events: none;
-      transition: top 0.14s ease, font-size 0.14s ease, color 0.14s ease;
+      transition: top 0.16s var(--ease), font-size 0.16s var(--ease), color 0.16s var(--ease);
     }
     .field input:focus { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
     .field input:focus + label,
@@ -244,12 +276,13 @@
 
     .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
     .btn {
+      position: relative;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
       min-height: 44px;
-      padding: 0 24px;
+      padding: 0 22px;
       border: 1px solid transparent;
       border-radius: 999px;
       background: transparent;
@@ -257,17 +290,28 @@
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      transition: filter 0.15s, background 0.15s, opacity 0.15s;
       white-space: nowrap;
+      transition: background var(--duration) var(--ease), color var(--duration) var(--ease),
+        transform var(--duration) var(--ease), opacity var(--duration) var(--ease);
     }
-    .btn:hover { filter: brightness(1.08); }
-    .btn:active { filter: brightness(0.94); }
-    .btn:disabled { opacity: 0.38; cursor: not-allowed; filter: none; }
+    .btn .icon { width: 20px; height: 20px; }
+    .btn:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.38; cursor: not-allowed; transform: none; background: transparent; }
     .btn.filled { background: var(--primary); color: var(--on-primary); }
+    .btn.filled:hover { background: color-mix(in srgb, var(--on-primary) 12%, var(--primary)); }
     .btn.tonal { background: var(--secondary-container); color: var(--on-secondary-container); }
+    .btn.tonal:hover { background: color-mix(in srgb, var(--on-secondary-container) 8%, var(--secondary-container)); }
     .btn.outlined { border-color: var(--outline); color: var(--primary); }
+    .btn.outlined:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
     .btn.text { padding: 0 12px; }
-    .btn.small { min-height: 36px; padding: 0 16px; font-size: 13px; }
+    .btn.danger { border-color: var(--error); color: var(--error); }
+    .btn.danger:hover { background: color-mix(in srgb, var(--error) 8%, transparent); }
+    .btn.small { min-height: 38px; padding: 0 16px; font-size: 13px; }
+    .btn:focus-visible, .icon-btn:focus-visible, .device:focus-visible, summary:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--primary) 45%, transparent);
+      outline-offset: 2px;
+    }
 
     .hint {
       margin-top: 12px;
@@ -275,61 +319,108 @@
       line-height: 1.6;
       color: var(--on-surface-variant);
     }
-        .device-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-height: 300px;
-      overflow: auto;
-      margin: 0 -4px;
-      padding: 0 4px;
-    }
-    .device {
+    .devices-card { padding: clamp(18px, 3vw, 28px); }
+    .devices-head { align-items: center; flex-wrap: wrap; }
+    .device-groups { display: flex; flex-direction: column; gap: 24px; }
+    .device-group { min-width: 0; }
+    .group-head {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding: 0 4px;
+    }
+    .group-icon {
+      width: 30px;
+      height: 30px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: var(--surface-container-high);
+      color: var(--on-surface-variant);
+    }
+    .group-icon .icon { width: 17px; height: 17px; }
+    .group-head h3 { font-size: 14px; font-weight: 600; letter-spacing: 0.01em; }
+    .count {
+      min-width: 28px;
+      height: 24px;
+      margin-inline-start: auto;
+      padding: 0 8px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 999px;
+      background: var(--surface-container-high);
+      color: var(--on-surface-variant);
+      font-size: 12px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .device-list { display: flex; flex-direction: column; gap: 6px; }
+    .device {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 14px;
       width: 100%;
-      padding: 12px;
+      min-height: 72px;
+      padding: 12px 16px;
       border: 1px solid transparent;
-      border-radius: var(--radius-sm);
-      background: var(--surface-1);
+      border-radius: 20px;
+      background: var(--surface-container-lowest);
       color: inherit;
       text-align: start;
       cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
+      overflow: hidden;
+      animation: row-in 220ms var(--ease) both;
+      transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease),
+        transform var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
     }
-    .device:hover { background: var(--surface-3); }
-    .device.selected { border-color: var(--primary); background: var(--primary-container); color: var(--on-primary-container); }
+    .device::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      pointer-events: none;
+      transition: background var(--duration) var(--ease);
+    }
+    .device:hover::after { background: color-mix(in srgb, currentColor 7%, transparent); }
+    .device:active { transform: scale(0.985); }
+    .device.active {
+      background: color-mix(in srgb, var(--primary-container) 55%, var(--surface-container-lowest));
+      border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+      box-shadow: var(--shadow-1);
+    }
     .device-icon {
       position: relative;
-      width: 36px;
-      height: 36px;
+      width: 48px;
+      height: 48px;
       flex: none;
-      border-radius: 12px;
-      background: var(--secondary-container);
-      color: var(--on-secondary-container);
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      background: var(--surface-container-high);
+      color: var(--primary);
     }
-    .device-icon::before {
-      content: "";
+    .device-icon .icon { width: 24px; height: 24px; }
+    .device-icon.active { background: var(--primary); color: var(--on-primary); }
+    .device-icon.saved { background: var(--secondary-container); color: var(--on-secondary-container); }
+    .device-icon.available { background: var(--tertiary-container); color: var(--on-tertiary-container); }
+    .device-icon .presence {
       position: absolute;
-      inset: 9px 11px;
-      border: 2px solid currentColor;
-      border-radius: 4px;
+      bottom: 3px;
+      inset-inline-end: 3px;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: var(--ok);
+      border: 2px solid var(--surface-container-lowest);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--ok) 30%, transparent);
     }
-    .device-icon::after {
-      content: "";
-      position: absolute;
-      bottom: 11px;
-      left: 50%;
-      width: 4px;
-      height: 1px;
-      transform: translateX(-50%);
-      background: currentColor;
-    }
-    .device-main { flex: 1; min-width: 0; }
+    .device-main { flex: 1; min-width: 0; display: block; }
     .device-main b {
       display: block;
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 600;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -337,6 +428,7 @@
     }
     .device-main small {
       display: block;
+      margin-top: 2px;
       font-size: 12px;
       color: var(--on-surface-variant);
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -344,38 +436,78 @@
       text-align: start;
       overflow-wrap: anywhere;
     }
-    .device.selected .device-main small { color: var(--on-primary-container); opacity: 0.75; }
+    .device-meta { display: flex; align-items: center; gap: 8px; flex: none; }
+    .auto-mark {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+    }
+    .auto-mark .icon { width: 16px; height: 16px; }
     .tag {
       flex: none;
-      padding: 3px 10px;
+      padding: 4px 10px;
       border-radius: 999px;
-      background: var(--surface-3);
+      background: var(--surface-container-high);
       color: var(--on-surface-variant);
       font-size: 11px;
       font-weight: 600;
       white-space: nowrap;
     }
-    .tag.warn { background: var(--warn-container); color: var(--warn); }
-    .tag.ok { background: var(--ok-container); color: var(--ok); }
-    .chevron {
-      width: 8px;
-      height: 8px;
-      flex: none;
-      border-inline-end: 2px solid currentColor;
-      border-bottom: 2px solid currentColor;
-      transform: rotate(-45deg);
-      opacity: 0.6;
-    }
-    html[dir="rtl"] .chevron { transform: rotate(135deg); }
-    .empty {
-      padding: 28px 16px;
+    .tag.active { background: var(--ok-container); color: var(--ok); }
+    .tag.saved { background: var(--secondary-container); color: var(--on-secondary-container); }
+    .tag.available { background: var(--warn-container); color: var(--warn); }
+    .tag.adb { background: var(--primary-container); color: var(--on-primary-container); }
+    .chevron { width: 24px; height: 24px; flex: none; display: grid; place-items: center; color: var(--on-surface-variant); opacity: 0.75; }
+    .chevron .icon { width: 20px; height: 20px; }
+    html[dir="rtl"] .chevron .icon { transform: scaleX(-1); }
+    .group-empty {
+      padding: 15px 16px;
       border: 1px dashed var(--outline-variant);
-      border-radius: var(--radius-sm);
-      text-align: center;
+      border-radius: var(--radius-md);
       color: var(--on-surface-variant);
       font-size: 13px;
       line-height: 1.7;
+      background: color-mix(in srgb, var(--surface-container-lowest) 55%, transparent);
     }
+    .manual {
+      margin-top: 22px;
+      padding-top: 14px;
+      border-top: 1px solid var(--outline-variant);
+    }
+    .manual summary {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 6px;
+      border-radius: var(--radius-sm);
+      color: var(--primary);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      list-style: none;
+      transition: background var(--duration) var(--ease);
+    }
+    .manual summary::-webkit-details-marker { display: none; }
+    .manual summary::after {
+      content: "";
+      width: 8px;
+      height: 8px;
+      margin-inline-start: auto;
+      border-inline-end: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(45deg);
+      transition: transform var(--duration) var(--ease);
+    }
+    .manual[open] summary::after { transform: rotate(225deg); }
+    .manual summary:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+    .manual summary .icon { width: 20px; height: 20px; }
+    .manual-body { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+    .manual .field { flex: 1; min-width: 220px; }
+    .manual .btn { margin-bottom: 1px; }
 
     .level-head {
       display: flex;
@@ -409,8 +541,8 @@
     }
     .kv > div {
       padding: 12px 14px;
-      border-radius: var(--radius-sm);
-      background: var(--surface-1);
+      border-radius: var(--radius-md);
+      background: var(--surface-container-lowest);
       min-width: 0;
     }
     .kv span { display: block; font-size: 11px; color: var(--on-surface-variant); margin-bottom: 4px; }
@@ -420,11 +552,6 @@
       font-weight: 600;
       overflow-wrap: anywhere;
     }
-    .mono {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      direction: ltr;
-      text-align: start;
-    }
     .stats {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -433,8 +560,8 @@
     }
     .stats > div {
       padding: 10px;
-      border-radius: 12px;
-      background: var(--surface-1);
+      border-radius: var(--radius-sm);
+      background: var(--surface-container-lowest);
       text-align: center;
     }
     .stats b {
@@ -445,14 +572,14 @@
     }
     .stats span { font-size: 11px; color: var(--on-surface-variant); }
 
-        .logs {
+    .logs {
       margin: 0;
       min-height: 160px;
       max-height: 300px;
       overflow: auto;
       padding: 14px;
-      border-radius: var(--radius-sm);
-      background: var(--surface-1);
+      border-radius: var(--radius-md);
+      background: var(--surface-container-lowest);
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px;
       line-height: 1.7;
@@ -473,15 +600,15 @@
       inset-inline: 50%;
       bottom: 24px;
       transform: translateX(50%);
-      z-index: 50;
+      z-index: 80;
       max-width: min(560px, calc(100vw - 32px));
       padding: 14px 18px;
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       background: var(--inverse-surface);
       color: var(--inverse-on-surface);
       font-size: 14px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-      transition: opacity 0.18s, transform 0.18s;
+      box-shadow: var(--shadow-3);
+      transition: opacity 0.18s var(--ease), transform 0.18s var(--ease);
     }
     .toast.hidden {
       opacity: 0;
@@ -489,6 +616,113 @@
       transform: translateX(50%) translateY(8px);
     }
     .toast.error { background: var(--error-container); color: var(--on-error-container); }
+
+    .dialog-scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(3px);
+      transition: opacity var(--duration) var(--ease);
+    }
+    .dialog-scrim.hidden { opacity: 0; pointer-events: none; }
+    .dialog {
+      width: min(560px, 100%);
+      max-height: min(720px, calc(100dvh - 32px));
+      overflow: auto;
+      padding: 24px;
+      border-radius: var(--radius-xl);
+      background: var(--surface-container-high);
+      color: var(--on-surface);
+      box-shadow: var(--shadow-3);
+      transform: translateY(0) scale(1);
+      transition: transform 220ms var(--ease), opacity 220ms var(--ease);
+    }
+    .dialog-scrim.hidden .dialog { transform: translateY(12px) scale(0.96); opacity: 0; }
+    .dialog-head { display: flex; align-items: flex-start; gap: 14px; }
+    .dialog-icon {
+      width: 56px;
+      height: 56px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+    }
+    .dialog-icon .icon { width: 28px; height: 28px; }
+    .dialog-title { flex: 1; min-width: 0; padding-top: 2px; }
+    .dialog-title h2 {
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+    .dialog-title p {
+      margin-top: 4px;
+      font-size: 13px;
+      color: var(--on-surface-variant);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      direction: ltr;
+      text-align: start;
+      overflow-wrap: anywhere;
+    }
+    .dialog-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+    .dialog-status .muted { font-size: 13px; color: var(--on-surface-variant); }
+    .dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .pref-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: var(--surface-container-low);
+    }
+    .pref-text { min-width: 0; }
+    .pref-text b { display: block; font-size: 14px; font-weight: 600; }
+    .pref-text small { display: block; margin-top: 2px; font-size: 12px; color: var(--on-surface-variant); line-height: 1.5; }
+    .switch { position: relative; width: 52px; height: 32px; flex: none; display: block; cursor: pointer; }
+    .switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+    .switch-track {
+      position: absolute;
+      inset: 0;
+      border: 2px solid var(--outline);
+      border-radius: 999px;
+      background: var(--surface-container-highest);
+      transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease);
+    }
+    .switch-thumb {
+      position: absolute;
+      top: 50%;
+      inset-inline-start: 6px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--outline);
+      transform: translateY(-50%);
+      transition: inset-inline-start 220ms var(--ease), width 220ms var(--ease),
+        height 220ms var(--ease), background var(--duration) var(--ease);
+    }
+    .switch input:checked + .switch-track { background: var(--primary); border-color: var(--primary); }
+    .switch input:checked + .switch-track .switch-thumb {
+      inset-inline-start: 22px;
+      width: 24px;
+      height: 24px;
+      background: var(--on-primary);
+    }
+    .switch input:focus-visible + .switch-track {
+      outline: 3px solid color-mix(in srgb, var(--primary) 45%, transparent);
+      outline-offset: 2px;
+    }
+    .switch input:disabled + .switch-track { opacity: 0.45; cursor: not-allowed; }
+    .pair-fields { margin-top: 4px; }
+    .pair-fields .hint { margin-top: 8px; }
+    .dialog-foot { display: flex; justify-content: flex-end; margin-top: 18px; }
 
     footer {
       max-width: 1120px;
@@ -499,29 +733,69 @@
       opacity: 0.8;
     }
 
+    @keyframes row-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     @media (max-width: 900px) {
-      .hero, .live-grid { grid-template-columns: 1fr; }
+      .live-grid { grid-template-columns: 1fr; }
       .status-grid { grid-template-columns: 1fr; }
     }
-    @media (max-width: 620px) {
+    @media (max-width: 640px) {
       .brand p { display: none; }
       .kv { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .card { padding: 16px; border-radius: 20px; }
-      .actions .btn { flex: 1; }
+      .card { border-radius: var(--radius-lg); }
+      .device { gap: 10px; padding: 12px; min-height: 68px; }
+      .device-icon { width: 44px; height: 44px; border-radius: 14px; }
+      .device-main b { font-size: 15px; }
+      .device-meta .tag { font-size: 10px; padding: 3px 8px; }
+      .auto-mark { display: none; }
       .state-chip { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; }
+      .devices-head { align-items: flex-start; }
+      .manual-body { align-items: stretch; }
+      .manual .field { min-width: 100%; }
+      .manual .btn { width: 100%; }
+      .dialog { padding: 20px; border-radius: var(--radius-lg); }
+      .dialog-title h2 { font-size: 20px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
     }
   </style>
 </head>
 <body>
+<svg class="svg-sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z"/></symbol>
+  <symbol id="i-smartphone" viewBox="0 0 24 24"><path d="M17 1.01 7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8 3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4 2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></symbol>
+  <symbol id="i-usb" viewBox="0 0 24 24"><path d="M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.07c.7-.37 1.2-1.1 1.2-1.93 0-1.21-.99-2.2-2.2-2.2S4.8 7.79 4.8 9c0 .83.5 1.56 1.2 1.93V13c0 1.1.9 2 2 2h3v3.05c-.71.37-1.2 1.1-1.2 1.95 0 1.22.99 2.2 2.2 2.2s2.2-.98 2.2-2.2c0-.85-.49-1.58-1.2-1.95V15h3c1.1 0 2-.9 2-2v-2h1V7h-4z"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></symbol>
+  <symbol id="i-link-off" viewBox="0 0 24 24"><path d="M17 7h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1 0 1.43-.98 2.63-2.31 2.98l1.46 1.46C20.88 15.61 22 13.95 22 12c0-2.76-2.24-5-5-5zm-1 4h-2.19l2 2H16zM2 4.27l3.11 3.11C3.29 8.12 2 9.91 2 12c0 2.76 2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1 0-1.59 1.21-2.9 2.76-3.07L8.73 11H8v2h2.73L13 15.27V17h1.73l4.01 4L20 19.74 3.27 3 2 4.27z"/></symbol>
+  <symbol id="i-delete" viewBox="0 0 24 24"><path d="M14.12 10.47 12 12.59l-2.13-2.12-1.41 1.41L10.59 14l-2.12 2.12 1.41 1.41L12 15.41l2.12 2.12 1.41-1.41L13.41 14l2.12-2.12zM6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5-1-1h-5l-1 1H5v2h14V4z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></symbol>
+  <symbol id="i-autorenew" viewBox="0 0 24 24"><path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/></symbol>
+  <symbol id="i-sensors" viewBox="0 0 24 24"><path d="M7.76 16.24C6.67 15.16 6 13.66 6 12s.67-3.16 1.76-4.24l1.42 1.42C8.45 9.89 8 10.9 8 12c0 1.1.45 2.11 1.17 2.83l-1.41 1.41zm8.48 0C17.33 15.16 18 13.66 18 12s-.67-3.16-1.76-4.24l-1.42 1.42C15.55 9.89 16 10.9 16 12c0 1.1-.45 2.11-1.17 2.83l1.41 1.41zM12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm7.07-5.66-1.42 1.42C19.76 7.87 21 9.8 21 12s-1.24 4.13-3.34 5.24l1.42 1.42C21.56 17.03 23 14.69 23 12s-1.44-5.03-3.93-6.66zM4.93 17.66l-1.42 1.42C1.44 17.03 0 14.69 0 12s1.44-5.03 3.93-6.66l1.42 1.42C3.24 7.87 2 9.8 2 12s1.24 4.13 3.34 5.24z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></symbol>
+  <symbol id="i-devices" viewBox="0 0 24 24"><path d="M4 6h18V4H4c-1.1 0-2 .9-2 2v11H0v3h14v-3H4V6zm19 2h-6c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1zm-1 9h-4v-7h4v7z"/></symbol>
+  <symbol id="i-listen" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></symbol>
+  <symbol id="i-log" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></symbol>
+  <symbol id="i-status" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></symbol>
+</svg>
+
 <header class="app-bar">
   <div class="brand">
     <div class="brand-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-        <rect x="9" y="3" width="6" height="11" rx="3"></rect>
-        <path d="M5.5 11a6.5 6.5 0 0 0 13 0"></path>
-        <path d="M12 17.5V21"></path>
-      </svg>
+      <svg class="icon"><use href="#i-mic"></use></svg>
     </div>
     <div>
       <h1 dir="ltr">Sawt+</h1>
@@ -540,52 +814,88 @@
     <button id="bannerClose" type="button" aria-label="close">×</button>
   </div>
 
-  <section class="hero">
-    <article class="card">
-      <div class="card-head">
+  <section class="card devices-card" aria-labelledby="devicesTitle">
+    <div class="card-head devices-head">
+      <div class="card-heading">
+        <span class="section-icon" aria-hidden="true">
+          <svg class="icon"><use href="#i-devices"></use></svg>
+        </span>
         <div>
-          <h2 data-i18n="connection">Connection</h2>
-          <p class="card-sub" data-i18n="connectionSub">Pick a nearby device, then pair once.</p>
+          <h2 id="devicesTitle" data-i18n="devices">Devices</h2>
+          <p class="card-sub" data-i18n="devicesSub">Active, available, and saved devices.</p>
         </div>
       </div>
+      <button id="discoverBtn" class="btn tonal small" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+        <span data-i18n="discover">Scan network</span>
+      </button>
+    </div>
 
-      <div class="field">
-        <input id="targetInput" class="mono" type="text" autocapitalize="off" spellcheck="false" placeholder=" " />
-        <label for="targetInput" data-i18n="targetAddress">Target address</label>
-      </div>
-
-      <div class="field">
-        <input id="pairCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder=" " />
-        <label for="pairCode" data-i18n="pairCode">6-digit code</label>
-      </div>
-
-      <div class="actions">
-        <button id="connectBtn" class="btn filled" type="button" data-i18n="connect">Connect</button>
-        <button id="disconnectBtn" class="btn outlined" type="button" data-i18n="disconnect">Disconnect</button>
-        <button id="pairBtn" class="btn tonal" type="button" data-i18n="pairConnect">Pair &amp; connect</button>
-        <button id="unpairBtn" class="btn outlined" type="button" data-i18n="unpair">Unpair</button>
-      </div>
-      <p class="hint" data-i18n="pairHint">The 6-digit code is shown in the Android app. Select a device below to fill the address; the first pairing is remembered.</p>
-    </article>
-
-    <article class="card">
-      <div class="card-head">
-        <div>
-          <h2 data-i18n="devices">Devices</h2>
-          <p class="card-sub" data-i18n="devicesSub">Nearby phones and saved devices.</p>
+    <div id="deviceGroups" class="device-groups">
+      <section class="device-group" aria-labelledby="activeHeading">
+        <div class="group-head">
+          <span class="group-icon" aria-hidden="true">
+            <svg class="icon"><use href="#i-sensors"></use></svg>
+          </span>
+          <h3 id="activeHeading" data-i18n="activeDevices">Active devices</h3>
+          <span id="activeCount" class="count">0</span>
         </div>
-        <button id="discoverBtn" class="btn tonal small" type="button" data-i18n="discover">Scan network</button>
+        <div id="activeList" class="device-list"></div>
+      </section>
+
+      <section class="device-group" aria-labelledby="availableHeading">
+        <div class="group-head">
+          <span class="group-icon" aria-hidden="true">
+            <svg class="icon"><use href="#i-wifi"></use></svg>
+          </span>
+          <h3 id="availableHeading" data-i18n="availableDevices">Available devices</h3>
+          <span id="availableCount" class="count">0</span>
+        </div>
+        <div id="availableList" class="device-list"></div>
+      </section>
+
+      <section class="device-group" aria-labelledby="savedHeading">
+        <div class="group-head">
+          <span class="group-icon" aria-hidden="true">
+            <svg class="icon"><use href="#i-bookmark"></use></svg>
+          </span>
+          <h3 id="savedHeading" data-i18n="savedDevices">Saved devices</h3>
+          <span id="savedCount" class="count">0</span>
+        </div>
+        <div id="savedList" class="device-list"></div>
+      </section>
+    </div>
+
+    <details class="manual">
+      <summary>
+        <svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg>
+        <span data-i18n="manualConnect">Manual connect</span>
+      </summary>
+      <div class="manual-body">
+        <div class="field">
+          <input id="targetInput" class="mono" type="text" autocapitalize="off" spellcheck="false" placeholder=" " />
+          <label for="targetInput" data-i18n="targetAddress">Device address (IP:PORT)</label>
+        </div>
+        <button id="manualConnectBtn" class="btn filled" type="button">
+          <svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg>
+          <span data-i18n="connect">Connect</span>
+        </button>
       </div>
-      <div id="deviceList" class="device-list"></div>
-    </article>
+      <p class="hint" data-i18n="manualHint">Use this if the device does not appear in the list.</p>
+    </details>
   </section>
 
   <section class="live-grid">
     <article class="card">
       <div class="card-head">
-        <div>
-          <h2 data-i18n="audio">Audio</h2>
-          <p class="card-sub" data-i18n="audioSub">Digital level applied on the computer.</p>
+        <div class="card-heading">
+          <span class="section-icon" aria-hidden="true">
+            <svg class="icon"><use href="#i-volume"></use></svg>
+          </span>
+          <div>
+            <h2 data-i18n="audio">Audio</h2>
+            <p class="card-sub" data-i18n="audioSub">Digital level applied on the computer.</p>
+          </div>
         </div>
       </div>
       <div class="level-head">
@@ -600,9 +910,14 @@
 
     <article class="card">
       <div class="card-head">
-        <div>
-          <h2 data-i18n="monitor">Monitor</h2>
-          <p class="card-sub" data-i18n="monitorHint">Play the live audio here. Use headphones to avoid feedback.</p>
+        <div class="card-heading">
+          <span class="section-icon" aria-hidden="true">
+            <svg class="icon"><use href="#i-listen"></use></svg>
+          </span>
+          <div>
+            <h2 data-i18n="monitor">Monitor</h2>
+            <p class="card-sub" data-i18n="monitorHint">Play the live audio here. Use headphones to avoid feedback.</p>
+          </div>
         </div>
       </div>
       <div class="actions">
@@ -614,7 +929,12 @@
 
   <section class="card">
     <div class="card-head">
-      <h2 data-i18n="statusTitle">Status</h2>
+      <div class="card-heading">
+        <span class="section-icon" aria-hidden="true">
+          <svg class="icon"><use href="#i-status"></use></svg>
+        </span>
+        <h2 data-i18n="statusTitle">Status</h2>
+      </div>
     </div>
     <div class="status-grid">
       <div class="kv">
@@ -635,7 +955,12 @@
 
   <section class="card">
     <div class="card-head">
-      <h2 data-i18n="logs">Log</h2>
+      <div class="card-heading">
+        <span class="section-icon" aria-hidden="true">
+          <svg class="icon"><use href="#i-log"></use></svg>
+        </span>
+        <h2 data-i18n="logs">Log</h2>
+      </div>
       <button id="clearLogs" class="btn text small" type="button" data-i18n="clear">Clear</button>
     </div>
     <pre id="logList" class="logs"></pre>
@@ -644,6 +969,70 @@
 
 <footer>Sawt+ · local control panel · ws://127.0.0.1</footer>
 <div id="toast" class="toast hidden" role="status"></div>
+
+<div id="deviceDialog" class="dialog-scrim hidden" aria-hidden="true">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+    <header class="dialog-head">
+      <span id="dialogIcon" class="dialog-icon" aria-hidden="true">
+        <svg class="icon"><use href="#i-devices"></use></svg>
+      </span>
+      <div class="dialog-title">
+        <h2 id="dialogTitle">—</h2>
+        <p id="dialogAddress" class="mono">—</p>
+      </div>
+      <button id="dialogClose" class="icon-btn" type="button" aria-label="close">
+        <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+      </button>
+    </header>
+
+    <div class="dialog-status">
+      <span id="dialogState" class="tag">—</span>
+      <span id="dialogTransport" class="muted">—</span>
+    </div>
+
+    <div id="dialogActions" class="dialog-actions">
+      <button id="dialogConnectBtn" class="btn filled" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg>
+        <span data-i18n="connect">Connect</span>
+      </button>
+      <button id="dialogDisconnectBtn" class="btn outlined" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-link-off"></use></svg>
+        <span data-i18n="disconnect">Disconnect</span>
+      </button>
+      <button id="dialogPairBtn" class="btn filled" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-key"></use></svg>
+        <span data-i18n="pairNow">Pair</span>
+      </button>
+      <button id="dialogUnpairBtn" class="btn danger" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-delete"></use></svg>
+        <span data-i18n="unpair">Unpair</span>
+      </button>
+    </div>
+
+    <div id="pairFields" class="pair-fields" hidden>
+      <div class="field">
+        <input id="dialogPairCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder=" " />
+        <label for="dialogPairCode" data-i18n="pairCode">6-digit code</label>
+      </div>
+      <p class="hint" data-i18n="pairCodeHint">Enter the 6-digit code shown in the Android app.</p>
+    </div>
+
+    <div id="autoConnectRow" class="pref-row">
+      <div class="pref-text">
+        <b data-i18n="autoConnect">Auto-connect</b>
+        <small data-i18n="autoConnectHint">Connect saved devices when Sawt+ starts.</small>
+      </div>
+      <label class="switch">
+        <input id="autoConnectToggle" type="checkbox" />
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+      </label>
+    </div>
+
+    <div class="dialog-foot">
+      <button id="dialogDismiss" class="btn text" type="button" data-i18n="close">Close</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const I18N = {
@@ -662,12 +1051,12 @@ const I18N = {
     connection: "الاتصال",
     connectionSub: "اختر جهازاً قريباً ثم اقترن مرة واحدة.",
     target: "الهدف",
-    targetAddress: "عنوان الشبكة أو USB",
+    targetAddress: "عنوان الجهاز (IP:PORT)",
     connect: "اتصال",
     disconnect: "قطع الاتصال",
     unpair: "قطع الاقتران",
     pairing: "الاقتران",
-    pairCode: "الرمز المكوّن من 6 أرقام",
+    pairCode: "رمز الاقتران",
     pairConnect: "اقترن واتصل",
     pairHint: "الرمز يظهر في تطبيق الأندرويد. اختر جهازاً من القائمة لملء العنوان، ويُحفظ الاقتران بعد المرة الأولى.",
     audio: "الصوت",
@@ -680,10 +1069,26 @@ const I18N = {
     listen: "استماع",
     stopListening: "إيقاف الاستماع",
     devices: "الأجهزة",
-    devicesSub: "الهواتف القريبة والأجهزة المحفوظة.",
+    devicesSub: "الأجهزة النشطة والمتوفرة والمحفوظة.",
     discover: "بحث في الشبكة",
     searching: "جارٍ البحث…",
+    activeDevices: "الأجهزة النشطة",
+    availableDevices: "الأجهزة المتوفرة",
+    savedDevices: "الأجهزة المحفوظة",
+    activeEmpty: "لا يوجد جهاز متصل حاليًا.",
+    availableEmpty: "لا توجد أجهزة غير مقترنة قريبة.",
+    savedEmpty: "لا توجد أجهزة محفوظة بعد.",
     saved: "محفوظ",
+    notPaired: "غير مقترن",
+    pairNow: "اقتران",
+    pairCodeHint: "أدخل الرمز المكوّن من 6 أرقام الظاهر في تطبيق الأندرويد.",
+    autoConnect: "الاتصال التلقائي",
+    autoConnectHint: "يبدأ الاتصال عند تشغيل Sawt+ مع الأجهزة المحفوظة.",
+    autoConnectOn: "تم تفعيل الاتصال التلقائي",
+    autoConnectOff: "تم إيقاف الاتصال التلقائي",
+    autoConnectFailed: "تعذّر تحديث الاتصال التلقائي",
+    manualConnect: "اتصال يدوي",
+    manualHint: "استخدمه إذا لم يظهر الجهاز في القائمة.",
     nearby: "قريب",
     connectAction: "اتصال",
     noDevices: "لا توجد أجهزة بعد. شغّل التطبيق على الجوال واضغط «بحث في الشبكة».",
@@ -696,7 +1101,7 @@ const I18N = {
     state_streaming: "يبث",
     state_error: "خطأ",
     transport_wifi: "واي فاي",
-    transport_adb: "ADB",
+    transport_adb: "USB/ADB",
     mono: "أحادي",
     on: "مفعّل",
     off: "متوقف",
@@ -739,14 +1144,16 @@ const I18N = {
     connection: "Connection",
     connectionSub: "Pick a nearby device, then pair once.",
     target: "Target",
-    targetAddress: "Network or USB address",
+    targetAddress: "Device address (IP:PORT)",
     connect: "Connect",
     disconnect: "Disconnect",
     unpair: "Unpair",
     pairing: "Pairing",
-    pairCode: "6-digit code",
+    pairCode: "Pairing code",
     pairConnect: "Pair & connect",
     pairHint: "The 6-digit code is shown in the Android app. Select a device below to fill the address; the first pairing is remembered.",
+    pairNow: "Pair",
+    pairCodeHint: "Enter the 6-digit code shown in the Android app.",
     audio: "Audio",
     audioSub: "Digital level applied on the computer.",
     gain: "Input level",
@@ -757,10 +1164,24 @@ const I18N = {
     listen: "Listen",
     stopListening: "Stop listening",
     devices: "Devices",
-    devicesSub: "Nearby phones and saved devices.",
+    devicesSub: "Active, available, and saved devices.",
     discover: "Scan network",
     searching: "Searching…",
+    activeDevices: "Active devices",
+    availableDevices: "Available devices",
+    savedDevices: "Saved devices",
+    activeEmpty: "No device is connected right now.",
+    availableEmpty: "No unpaired devices nearby.",
+    savedEmpty: "No saved devices yet.",
     saved: "saved",
+    notPaired: "not paired",
+    autoConnect: "Auto-connect",
+    autoConnectHint: "Connect saved devices when Sawt+ starts.",
+    autoConnectOn: "Auto-connect enabled",
+    autoConnectOff: "Auto-connect disabled",
+    autoConnectFailed: "Could not update auto-connect",
+    manualConnect: "Manual connect",
+    manualHint: "Use this if the device does not appear in the list.",
     nearby: "nearby",
     connectAction: "Connect",
     noDevices: "No devices yet. Start the phone app and tap “Scan network”.",
@@ -773,7 +1194,7 @@ const I18N = {
     state_streaming: "streaming",
     state_error: "error",
     transport_wifi: "Wi-Fi",
-    transport_adb: "ADB",
+    transport_adb: "USB/ADB",
     mono: "mono",
     on: "on",
     off: "off",
@@ -815,12 +1236,15 @@ const ui = {
   status: null,
   discovered: [],
   saved: [],
+  config: null,
   logs: [],
   monitor: { ws: null, ctx: null, next: 0 },
   toastTimer: null,
   lastUptime: 0,
   uptimeTimer: null,
-  selected: null
+  dialog: null,
+  lastFocus: null,
+  activeKey: ""
 };
 
 function applyLanguage() {
@@ -832,6 +1256,7 @@ function applyLanguage() {
   });
   if (ui.status) renderStatus(ui.status);
   renderDevices();
+  renderDialog();
   renderLogs();
   renderMonitor();
 }
@@ -891,10 +1316,140 @@ function formatUptime(since) {
   return m + "m " + String(s).padStart(2, "0") + "s";
 }
 
-function setTarget(address, name) {
-  ui.selected = address ? { address, name: name || address } : null;
-  $("targetInput").value = address || "";
-  renderDevices();
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+function icon(name, className) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", className || "icon");
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  use.setAttribute("href", "#i-" + name);
+  svg.append(use);
+  return svg;
+}
+
+function autoConnectEnabled() {
+  return !!(ui.config && ui.config.Daemon && ui.config.Daemon.AutoConnect);
+}
+
+function sameDevice(a, b) {
+  if (!a || !b) return false;
+  if (a.address && b.address && a.address === b.address) return true;
+  return !!(a.id && b.id && a.id === b.id);
+}
+
+function activeDevice() {
+  const st = ui.status;
+  if (!st || !st.address) return null;
+  if (!["streaming", "connecting", "pairing"].includes(st.state)) return null;
+  return {
+    id: st.device_id || "",
+    name: st.device || st.address,
+    address: st.address,
+    transport: st.transport || "wifi",
+    kind: "active",
+    state: st.state
+  };
+}
+
+function groupDevices() {
+  const groups = { active: [], available: [], saved: [] };
+  const active = activeDevice();
+  if (active) groups.active.push(active);
+  ui.saved.forEach((dev) => {
+    if (active && sameDevice(dev, active)) return;
+    groups.saved.push({
+      id: dev.id || "",
+      name: dev.name || dev.address,
+      address: dev.address,
+      transport: dev.transport || "wifi",
+      kind: "saved",
+      saved: true,
+      pairing: false
+    });
+  });
+  ui.discovered.forEach((dev) => {
+    const item = {
+      id: dev.id || "",
+      name: dev.name || dev.host || dev.address,
+      address: dev.address,
+      transport: dev.transport || "wifi",
+      kind: "available",
+      saved: false,
+      pairing: !!dev.pairing
+    };
+    if (active && sameDevice(item, active)) return;
+    if (groups.saved.some((saved) => sameDevice(saved, item))) return;
+    if (groups.available.some((other) => sameDevice(other, item))) return;
+    groups.available.push(item);
+  });
+  return groups;
+}
+
+function renderGroup(key, devices) {
+  const list = $(key + "List");
+  const count = $(key + "Count");
+  if (count) count.textContent = devices.length;
+  list.replaceChildren();
+  if (!devices.length) {
+    list.append(el("div", "group-empty", t(key + "Empty")));
+    return;
+  }
+  devices.forEach((dev) => list.append(deviceRow(dev)));
+}
+
+function deviceRow(dev) {
+  const row = el("button", "device " + dev.kind);
+  row.type = "button";
+
+  const iconWrap = el("span", "device-icon " + dev.kind);
+  const iconName = dev.transport === "adb"
+    ? "usb"
+    : dev.kind === "active" ? "sensors" : dev.kind === "saved" ? "bookmark" : "wifi";
+  iconWrap.append(icon(iconName));
+  if (dev.kind === "active") iconWrap.append(el("span", "presence"));
+  row.append(iconWrap);
+
+  const main = el("span", "device-main");
+  main.append(el("b", null, dev.name || t("none")));
+  main.append(el("small", "mono", dev.address || ""));
+  row.append(main);
+
+  const meta = el("span", "device-meta");
+  if (autoConnectEnabled() && dev.kind !== "active") {
+    const mark = el("span", "auto-mark");
+    mark.title = t("autoConnect");
+    mark.append(icon("autorenew"));
+    meta.append(mark);
+  }
+  const tag = el("span", "tag");
+  if (dev.transport === "adb") {
+    tag.className = "tag adb";
+    tag.textContent = t("transport_adb");
+  } else if (dev.kind === "active") {
+    tag.className = "tag active";
+    tag.textContent = stateLabel(dev.state || (ui.status && ui.status.state));
+  } else if (dev.kind === "saved") {
+    tag.className = "tag saved";
+    tag.textContent = t("saved");
+  } else {
+    tag.className = "tag available";
+    tag.textContent = t("notPaired");
+  }
+  meta.append(tag);
+  row.append(meta);
+
+  const chevron = el("span", "chevron");
+  chevron.append(icon("chevron"));
+  row.append(chevron);
+
+  row.addEventListener("click", () => openDeviceDialog(dev));
+  return row;
 }
 
 function renderStatus(st) {
@@ -918,9 +1473,6 @@ function renderStatus(st) {
   $("droppedText").textContent = Number(st.dropped || 0).toLocaleString(lang);
   $("rttText").textContent = st.rtt_ms || 0;
 
-  if (!ui.selected && st.address) {
-    setTarget(st.address, st.device);
-  }
   if (document.activeElement !== $("gainRange")) {
     $("gainRange").value = st.gain != null ? st.gain : 1;
   }
@@ -929,9 +1481,11 @@ function renderStatus(st) {
   $("muteBtn").classList.toggle("filled", !!st.mute);
   $("muteBtn").classList.toggle("outlined", !st.mute);
 
-  const busy = st.state === "connecting" || st.state === "discovering";
-  $("connectBtn").disabled = busy || st.state === "streaming";
-  $("disconnectBtn").disabled = st.state === "idle" && !st.device;
+  const nextKey = [st.state || "", st.address || "", st.device_id || ""].join("|");
+  if (nextKey !== ui.activeKey) {
+    ui.activeKey = nextKey;
+    renderDevices();
+  }
 
   if (st.error) showBanner(st.error);
   else if (!badge.classList.contains("offline")) showBanner("");
@@ -946,92 +1500,85 @@ function updateUptime() {
 }
 
 function renderDevices() {
-  const list = $("deviceList");
-  const merged = [];
-  const seen = new Set();
-  ui.saved.forEach((dev) => {
-    merged.push({
-      id: dev.id,
-      name: dev.name || dev.address,
-      address: dev.address,
-      saved: true,
-      pairing: false,
-      transport: "wifi"
-    });
-    seen.add(dev.address);
-  });
-  ui.discovered.forEach((dev) => {
-    if (seen.has(dev.address)) return;
-    merged.push({
-      id: dev.id,
-      name: dev.name || dev.host || dev.address,
-      address: dev.address,
-      saved: false,
-      pairing: !!dev.pairing,
-      transport: dev.transport || "wifi"
-    });
-  });
+  const groups = groupDevices();
+  renderGroup("active", groups.active);
+  renderGroup("available", groups.available);
+  renderGroup("saved", groups.saved);
+  if (ui.dialog) renderDialog();
+}
 
-  const savedSelected = ui.selected && ui.saved.some((dev) => dev.address === ui.selected.address);
-  $("unpairBtn").disabled = !savedSelected;
+function resolveDialogDevice() {
+  if (!ui.dialog) return null;
+  const groups = groupDevices();
+  const all = groups.active.concat(groups.available, groups.saved);
+  return all.find((dev) => sameDevice(dev, ui.dialog)) || ui.dialog.snapshot;
+}
 
-  list.replaceChildren();
-  if (!merged.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty";
-    empty.textContent = t("noDevices");
-    list.append(empty);
+function openDeviceDialog(dev) {
+  ui.lastFocus = document.activeElement;
+  ui.dialog = { address: dev.address, id: dev.id, snapshot: dev };
+  $("dialogPairCode").value = "";
+  renderDialog();
+  $("deviceDialog").classList.remove("hidden");
+  $("deviceDialog").setAttribute("aria-hidden", "false");
+  document.body.classList.add("dialog-open");
+  requestAnimationFrame(() => $("dialogClose").focus());
+}
+
+function closeDeviceDialog() {
+  if (!ui.dialog) return;
+  ui.dialog = null;
+  $("deviceDialog").classList.add("hidden");
+  $("deviceDialog").setAttribute("aria-hidden", "true");
+  document.body.classList.remove("dialog-open");
+  if (ui.lastFocus && ui.lastFocus.focus) ui.lastFocus.focus();
+  ui.lastFocus = null;
+}
+
+function renderDialog() {
+  const dev = resolveDialogDevice();
+  if (!dev) {
+    closeDeviceDialog();
     return;
   }
+  $("dialogTitle").textContent = dev.name || dev.address || t("none");
+  $("dialogAddress").textContent = dev.address || t("none");
 
-  merged.forEach((dev) => {
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = "device";
-    if (ui.selected && ui.selected.address === dev.address) row.classList.add("selected");
+  const iconName = dev.transport === "adb"
+    ? "usb"
+    : dev.kind === "active" ? "sensors" : dev.kind === "saved" ? "bookmark" : "wifi";
+  $("dialogIcon").replaceChildren(icon(iconName, "icon"));
 
-    const icon = document.createElement("span");
-    icon.className = "device-icon";
-    icon.setAttribute("aria-hidden", "true");
-    row.append(icon);
+  const state = $("dialogState");
+  if (dev.kind === "active") {
+    state.className = "tag active";
+    state.textContent = stateLabel(dev.state || (ui.status && ui.status.state));
+  } else if (dev.kind === "saved") {
+    state.className = "tag saved";
+    state.textContent = t("saved");
+  } else if (dev.transport === "adb") {
+    state.className = "tag adb";
+    state.textContent = t("transport_adb");
+  } else {
+    state.className = "tag available";
+    state.textContent = t("notPaired");
+  }
+  $("dialogTransport").textContent = transportLabel(dev.transport || "wifi");
 
-    const main = document.createElement("div");
-    main.className = "device-main";
-    const name = document.createElement("b");
-    name.textContent = dev.name || t("none");
-    const addr = document.createElement("small");
-    addr.textContent = dev.address || "";
-    main.append(name, addr);
-    row.append(main);
+  const isActive = dev.kind === "active";
+  const isSaved = dev.kind === "saved";
+  const isAvailable = dev.kind === "available";
+  const isAdbAvailable = isAvailable && dev.transport === "adb";
+  const isWifiAvailable = isAvailable && dev.transport !== "adb";
 
-    const tag = document.createElement("span");
-    if (dev.transport === "adb") {
-      tag.className = "tag ok";
-      tag.textContent = t("transport_adb");
-    } else if (dev.pairing) {
-      tag.className = "tag warn";
-      tag.textContent = stateLabel("pairing");
-    } else {
-      tag.className = "tag ok";
-      tag.textContent = (dev.saved ? t("saved") + " · " : "") + t("transport_wifi");
-    }
-    row.append(tag);
-
-    const chevron = document.createElement("span");
-    chevron.className = "chevron";
-    chevron.setAttribute("aria-hidden", "true");
-    row.append(chevron);
-
-    row.addEventListener("click", () => {
-      setTarget(dev.address, dev.name);
-      if (dev.transport !== "adb" && dev.pairing) {
-        $("pairCode").focus();
-        return;
-      }
-      doConnect();
-    });
-    list.append(row);
-  });
+  $("dialogConnectBtn").hidden = !(isSaved || isAdbAvailable);
+  $("dialogDisconnectBtn").hidden = !(isActive || isSaved);
+  $("dialogPairBtn").hidden = !isWifiAvailable;
+  $("dialogUnpairBtn").hidden = !isSaved;
+  $("pairFields").hidden = !isWifiAvailable;
+  $("autoConnectRow").hidden = isActive;
+  $("autoConnectToggle").checked = autoConnectEnabled();
+  $("autoConnectToggle").disabled = !ui.config;
 }
 
 function renderLogs() {
@@ -1085,98 +1632,124 @@ async function loadLogs() {
   } catch (_) {}
 }
 
-async function doConnect() {
-  const target = $("targetInput").value.trim();
-  if (!target) {
+async function loadConfig() {
+  try {
+    const cfg = await api("/api/config");
+    ui.config = cfg && cfg.Daemon ? cfg : null;
+    renderDevices();
+  } catch (_) {}
+}
+
+async function connectTo(target) {
+  const value = (target || "").trim();
+  if (!value) {
     toast(t("needTarget"), "error");
-    $("targetInput").focus();
-    return;
+    return false;
   }
   try {
-    $("connectBtn").disabled = true;
-    await api("/api/connect", "POST", { target });
+    await api("/api/connect", "POST", { target: value });
     toast(t("connecting"));
+    return true;
   } catch (err) {
-    $("connectBtn").disabled = false;
     toast(err.message, "error");
+    return false;
   }
 }
 
-async function doDisconnect() {
+async function disconnectDevice() {
   try {
     await api("/api/disconnect", "POST", {});
     toast(t("disconnected"));
+    return true;
   } catch (err) {
     toast(err.message, "error");
+    return false;
   }
 }
 
-async function doUnpair() {
-  const target = $("targetInput").value.trim();
+async function unpairDevice(target) {
   if (!target) {
     toast(t("needTarget"), "error");
-    $("targetInput").focus();
-    return;
+    return false;
   }
-  $("unpairBtn").disabled = true;
   try {
     await api("/api/unpair", "POST", { target });
     toast(t("unpaired"));
-    $("pairCode").value = "";
     await loadSaved();
+    return true;
   } catch (err) {
     toast(err.message, "error");
-  } finally {
-    renderDevices();
+    return false;
   }
 }
 
-function parsePairTarget(value) {
-  if (!value.startsWith("sawtplus://")) return null;
-  try {
-    const url = new URL(value);
-    if (url.host !== "pair") return null;
-    const host = url.searchParams.get("host");
-    const port = url.searchParams.get("port") || "8765";
-    const code = url.searchParams.get("code") || "";
-    if (!host) return null;
-    return { target: host + ":" + port, code };
-  } catch (_) {
-    return null;
-  }
-}
-
-async function doPair() {
-  let target = $("targetInput").value.trim();
-  let code = $("pairCode").value.trim();
-  const parsed = parsePairTarget(target);
-  if (parsed) {
-    target = parsed.target;
-    code = code || parsed.code;
-  }
-  if (!target) {
-    toast(t("needTarget"), "error");
-    $("targetInput").focus();
+async function setAutoConnect(next) {
+  if (!ui.config) await loadConfig();
+  if (!ui.config) {
+    $("autoConnectToggle").checked = !next;
+    toast(t("autoConnectFailed"), "error");
     return;
   }
+  const payload = JSON.parse(JSON.stringify(ui.config));
+  payload.Daemon = payload.Daemon || {};
+  payload.Daemon.AutoConnect = next;
+  try {
+    const cfg = await api("/api/config", "PUT", payload);
+    ui.config = cfg && cfg.Daemon ? cfg : ui.config;
+    toast(next ? t("autoConnectOn") : t("autoConnectOff"));
+    renderDevices();
+  } catch (err) {
+    $("autoConnectToggle").checked = !next;
+    toast(t("autoConnectFailed") + ": " + err.message, "error");
+  }
+}
+
+async function dialogConnect() {
+  const dev = resolveDialogDevice();
+  if (!dev) return;
+  if (await connectTo(dev.address)) closeDeviceDialog();
+}
+
+async function dialogDisconnect() {
+  if (await disconnectDevice()) closeDeviceDialog();
+}
+
+async function dialogUnpair() {
+  const dev = resolveDialogDevice();
+  if (!dev) return;
+  const ok = await unpairDevice(dev.address);
+  if (ok) closeDeviceDialog();
+}
+
+async function dialogPair() {
+  const dev = resolveDialogDevice();
+  if (!dev) return;
+  const code = $("dialogPairCode").value.trim();
   if (!code) {
     toast(t("needCode"), "error");
-    $("pairCode").focus();
+    $("dialogPairCode").focus();
     return;
   }
-  $("pairBtn").disabled = true;
+  const button = $("dialogPairBtn");
+  button.disabled = true;
   try {
-    const entry = await api("/api/pair", "POST", { target, code });
-    toast(t("paired") + ": " + (entry.name || entry.address));
-    setTarget(entry.address || target, entry.name);
-    $("pairCode").value = "";
-    loadSaved();
-    await api("/api/connect", "POST", { target: entry.address || target });
+    const entry = await api("/api/pair", "POST", { target: dev.address, code });
+    const name = entry.Name || entry.name || dev.name;
+    const address = entry.Address || entry.address || dev.address;
+    toast(t("paired") + ": " + (name || address));
+    $("dialogPairCode").value = "";
+    closeDeviceDialog();
+    await loadSaved();
+    await connectTo(address);
   } catch (err) {
     toast(err.message, "error");
   } finally {
-    $("pairBtn").disabled = false;
+    button.disabled = false;
   }
+}
+
+function manualConnect() {
+  connectTo($("targetInput").value);
 }
 
 async function doGain(value) {
@@ -1200,24 +1773,20 @@ async function doMute() {
 
 async function doDiscover() {
   const button = $("discoverBtn");
+  const label = button.querySelector("[data-i18n='discover']") || button;
   button.disabled = true;
-  button.textContent = t("searching");
+  label.textContent = t("searching");
   try {
     const data = await api("/api/devices?timeout=3s");
-    const devices = data.devices || [];
-    ui.discovered = devices;
-    if (!ui.selected && devices.length === 1) {
-      const dev = devices[0];
-      setTarget(dev.address, dev.name || dev.host);
-    }
+    ui.discovered = data.devices || [];
     renderDevices();
     if (data.error) toast(data.error, "error");
-    else toast(devices.length + " " + t("found"));
+    else toast(ui.discovered.length + " " + t("found"));
   } catch (err) {
     toast(t("discoverFailed") + ": " + err.message, "error");
   } finally {
     button.disabled = false;
-    button.textContent = t("discover");
+    label.textContent = t("discover");
   }
 }
 
@@ -1310,13 +1879,16 @@ $("langBtn").addEventListener("click", () => {
   applyLanguage();
 });
 $("bannerClose").addEventListener("click", () => showBanner(""));
-$("connectBtn").addEventListener("click", doConnect);
-$("disconnectBtn").addEventListener("click", doDisconnect);
-$("pairBtn").addEventListener("click", doPair);
-$("unpairBtn").addEventListener("click", doUnpair);
 $("muteBtn").addEventListener("click", doMute);
 $("discoverBtn").addEventListener("click", doDiscover);
 $("monitorBtn").addEventListener("click", toggleMonitor);
+$("manualConnectBtn").addEventListener("click", manualConnect);
+$("targetInput").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    manualConnect();
+  }
+});
 $("clearLogs").addEventListener("click", () => {
   ui.logs = [];
   renderLogs();
@@ -1327,22 +1899,35 @@ $("gainRange").addEventListener("input", () => {
 $("gainRange").addEventListener("change", () => {
   doGain(Number($("gainRange").value));
 });
-$("targetInput").addEventListener("input", () => {
-  const address = $("targetInput").value.trim();
-  ui.selected = address ? { address, name: address } : null;
-  renderDevices();
+
+$("dialogClose").addEventListener("click", closeDeviceDialog);
+$("dialogDismiss").addEventListener("click", closeDeviceDialog);
+$("deviceDialog").addEventListener("click", (event) => {
+  if (event.target === $("deviceDialog")) closeDeviceDialog();
 });
-$("targetInput").addEventListener("keydown", (event) => {
-  if (event.key === "Enter") doConnect();
+$("dialogConnectBtn").addEventListener("click", dialogConnect);
+$("dialogDisconnectBtn").addEventListener("click", dialogDisconnect);
+$("dialogPairBtn").addEventListener("click", dialogPair);
+$("dialogUnpairBtn").addEventListener("click", dialogUnpair);
+$("autoConnectToggle").addEventListener("change", (event) => {
+  setAutoConnect(event.target.checked);
 });
-$("pairCode").addEventListener("keydown", (event) => {
-  if (event.key === "Enter") doPair();
+$("dialogPairCode").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    dialogPair();
+  }
 });
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && ui.dialog) closeDeviceDialog();
+});
+
 applyLanguage();
 renderMonitor();
 connectEvents();
 loadSaved();
 loadLogs();
+loadConfig();
 api("/api/status").then(renderStatus).catch((err) => {
   const unauthorized = err && /unauthorized/i.test(err.message || "");
   showBanner(t(unauthorized ? "authRequired" : "daemonOffline"));
