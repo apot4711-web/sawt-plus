@@ -2,7 +2,7 @@
 
 This guide is for advanced users, manual installation, and network
 troubleshooting. If you only want the basic steps, start with the
-[README](../README.md).
+[README](../README.en.md).
 
 ## Manual installation
 
@@ -258,4 +258,4 @@ control messages and binary audio frames.
 
 ---
 
-[Back to the main README](../README.md) · [الدليل العربي](advanced.ar.md)
+[Back to the main README](../README.en.md) · [الدليل العربي](advanced.ar.md)

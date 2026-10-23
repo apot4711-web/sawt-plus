@@ -1,76 +1,255 @@
-# Sawt+ (صوت+)
+<a id="top"></a>
 
-**English** · [العربية](README.ar.md)
+<div align="center" dir="rtl">
+  <img src="assets/banner.svg" alt="Sawt+ — ميكروفون لاسلكي لحاسوب لينكس" width="100%">
+  <h3>هاتفك، ميكروفون لحاسوبك.</h3>
+  <p>
+    يحوّل صوت+ هاتف أندرويد إلى ميكروفون لاسلكي لحاسوب لينكس، عبر شبكة Wi-Fi المحلية.
+    لا حساب، ولا سحابة، ولا تعقيد.
+  </p>
+  <p dir="ltr"><a href="README.en.md">English</a> · <b>العربية</b></p>
+  <p dir="ltr">
+    <a href="https://github.com/apot4711-web/sawt-plus/releases/latest"><img alt="أحدث إصدار" src="https://img.shields.io/github/v/release/apot4711-web/sawt-plus?style=for-the-badge&color=3daee9&label=release"></a>
+    <img alt="الترخيص: MIT" src="https://img.shields.io/badge/license-MIT-8a5cd6?style=for-the-badge">
+    <img alt="أندرويد 5.0 فأحدث" src="https://img.shields.io/badge/Android-5.0%2B-3ddc84?style=for-the-badge&logo=android&logoColor=white">
+    <img alt="لينكس" src="https://img.shields.io/badge/Linux-PipeWire-ffbc00?style=for-the-badge&logo=linux&logoColor=black">
+    <img alt="Wi-Fi" src="https://img.shields.io/badge/transport-Wi--Fi-1d99f3?style=for-the-badge&logo=wifi&logoColor=white">
+  </p>
+  <p>
+    <a href="#start"><b>ابدأ</b></a> ·
+    <a href="#what"><b>ما هو صوت+؟</b></a> ·
+    <a href="#features"><b>المزايا</b></a> ·
+    <a href="#how"><b>كيف يعمل؟</b></a> ·
+    <a href="#controls"><b>التحكم</b></a> ·
+    <a href="#faq"><b>الأسئلة الشائعة</b></a> ·
+    <a href="#advanced"><b>للمتقدّمين</b></a>
+  </p>
+</div>
 
-> **Notice**
->
-> This is a personal project built with the help of artificial intelligence.
-> I am a programming beginner, and I made this project for my own personal use.
-> I published it in the hope that it will be useful to others. It is not a
-> commercial product and comes with no warranty or support.
+> [!NOTE]
+> هذا مشروع شخصي بُني بمساعدة الذكاء الاصطناعي. أنا مبتدئ برمجيًا، وقد طوّرته
+> لاستخدامي الشخصي ثم نشرته على أمل أن يفيد الآخرين. ليس منتجًا تجاريًا، ولا
+> أقدّم له دعمًا رسميًا.
 
-## Quick Start
+---
 
-**What you need**
+<a id="start"></a>
 
-- A Linux computer with PipeWire or PulseAudio (most systems support this).
-- An Android phone running Android 5.0 or newer.
-- Both devices connected to the same Wi-Fi network.
+## ابدأ في دقيقة
 
-**Steps**
+**ما تحتاجه**
 
-1. Download and install the [Android app](https://github.com/apot4711-web/sawt-plus/releases/latest/download/sawt-plus.apk). If a security warning appears during installation, choose **Install anyway** or **Allow**.
-2. Download the [computer program](https://github.com/apot4711-web/sawt-plus/releases/latest/download/sawt-linux-amd64) and save it on the computer. Then make it executable and start it:
+| المتطلب | التفاصيل |
+| --- | --- |
+| الحاسوب | لينكس مع PipeWire أو PulseAudio (أغلب التوزيعات الحديثة تدعم ذلك) |
+| الهاتف | أندرويد 5.0 أو أحدث |
+| الشبكة | الجهازان على نفس شبكة Wi-Fi |
+
+**الخطوات**
+
+1. نزّل [تطبيق الأندرويد](https://github.com/apot4711-web/sawt-plus/releases/latest/download/sawt-plus.apk) وثبّته على الهاتف. إذا ظهر تحذير أمني أثناء التثبيت، اختر **تثبيت على أي حال** أو **السماح**.
+
+2. نزّل [برنامج الحاسوب](https://github.com/apot4711-web/sawt-plus/releases/latest/download/sawt-linux-amd64) واحفظه، ثم اجعله قابلًا للتنفيذ وشغّله:
 
    ```bash
    chmod +x ~/Downloads/sawt-linux-amd64
    ~/Downloads/sawt-linux-amd64 web
    ```
 
-   If your file is in a different folder, change the path to match where you saved it. The [advanced guide](docs/advanced.md#linux-computer) has more details.
+   إذا حفظت الملف في مجلد آخر، غيّر المسار حسب مكان التنزيل. دليل
+   [المستخدم المتقدّم](docs/advanced.ar.md#حاسوب-لينكس) فيه تفاصيل أكثر.
 
-3. Open the app on the phone and tap **Start service**. Then start the Sawt+ program on the computer and enter the 6-digit code shown in the app.
-4. Choose **Sawt+** (`sawt-plus`) as the microphone in your audio settings or meeting apps.
+3. افتح التطبيق على الهاتف واضغط **تشغيل الخدمة**، ثم شغّل برنامج صوت+ على الحاسوب وأدخل الرمز المكوّن من ٦ أرقام الظاهر في التطبيق.
 
-That is all you need to get started. The [advanced guide](docs/advanced.md) has
-every technical detail and troubleshooting step.
+4. اختر **Sawt+** (`sawt-plus`) كميكروفون في إعدادات الصوت أو في تطبيق الاجتماعات.
 
-## What it does
+> [!TIP]
+> بعد الاقتران الأول يصبح الاتصال تلقائيًا في المرات القادمة. الملف التنفيذي
+> الواحد يكفي: لا تحتاج إلى تثبيت حزم إضافية على الحاسوب.
 
-Sawt+ turns an Android phone into a wireless microphone for a Linux computer.
-The phone captures its microphone and streams it over the local Wi-Fi network to
-a small program on the computer, which exposes it as a microphone for your
-meeting or recording app.
-
-Sawt+ is based on [`gdzx/audiosource`](https://github.com/gdzx/audiosource), but
-uses Wi-Fi as the primary connection and adds pairing, discovery, input-level
-control, and a Material 3 Android app. It is a separate project and does not
-replace the original app.
-
-## Features
-
-- Phone microphone over local Wi-Fi, with USB/ADB as a fallback.
-- Pair once with a 6-digit code; connections are automatic afterwards.
-- Control mute and input level from the phone, the terminal, or a local web page.
-- Optional local web page; no Node.js required.
-- English and Arabic interface with RTL support.
-
-## Advanced use
-
-Everything technical is documented in **[docs/advanced.md](docs/advanced.md)**:
-manual install commands, the full CLI, firewall and discovery notes, USB/ADB,
-checksums, and troubleshooting.
-
-## Credits
-
-- Original project: [`gdzx/audiosource`](https://github.com/gdzx/audiosource).
-- [sndcpy](https://github.com/rom1v/sndcpy) for the initial approach to audio
-  forwarding.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+<!-- IMAGE SLOT: hero
+     عندما تتوفر صورة واجهة صوت+، استبدل هذا التعليق بـ:
+     <p align="center"><img src="assets/media/hero.png" alt="واجهة صوت+" width="92%"></p>
+-->
 
 ---
 
-For advanced users or network problems: see [docs/advanced.md](docs/advanced.md).
+<a id="what"></a>
+
+## ما هو صوت+؟
+
+صوت+ يحوّل هاتف أندرويد إلى ميكروفون لاسلكي لحاسوب لينكس. يلتقط الهاتف الصوت من
+ميكروفونه، ويبثّه عبر شبكة Wi-Fi المحلية إلى برنامج صغير على الحاسوب، فيظهر
+كمصدر صوت باسم `sawt-plus` تستطيع اختياره في أي تطبيق اجتماعات أو تسجيل.
+
+المشروع مبني على [`gdzx/audiosource`](https://github.com/gdzx/audiosource)، لكنه
+يستخدم Wi-Fi كاتصال أساسي، ويضيف الاقتران والاكتشاف والتحكم في مستوى الصوت
+وتطبيق أندرويد بتصميم Material 3. هو مشروع منفصل ولا يستبدل التطبيق الأصلي.
+
+---
+
+<a id="features"></a>
+
+## المزايا
+
+| الميزة | ماذا تعني لك |
+| --- | --- |
+| اتصال Wi-Fi محلي | جودة ثابتة واستجابة سريعة دون كابلات |
+| USB/ADB كبديل | خيار احتياطي عندما لا تتوفر شبكة مشتركة |
+| اقتران مرة واحدة | رمز من ٦ أرقام، ثم اتصال تلقائي |
+| تحكم كامل | من الهاتف أو الطرفية أو صفحة ويب محلية |
+| واجهة عربية وإنجليزية | مع دعم كامل للاتجاه من اليمين إلى اليسار |
+| بدون سحابة | الصوت يبقى داخل شبكتك المحلية |
+| مفتوح المصدر | ترخيص MIT، والكود متاح للجميع |
+
+---
+
+<a id="how"></a>
+
+## كيف يعمل؟
+
+| الخطوة | ما يحدث |
+| --- | --- |
+| 1 | يلتقط الهاتف الصوت من الميكروفون |
+| 2 | يبثّه عبر Wi-Fi إلى برنامج صوت+ على الحاسوب |
+| 3 | يستقبل البرنامج الصوت ويحوّله إلى مصدر PipeWire أو PulseAudio |
+| 4 | يظهر المصدر باسم `sawt-plus` في تطبيقات الاجتماعات والتسجيل |
+| 5 | تتحكم في مستوى الصوت من الهاتف أو الطرفية أو صفحة الويب |
+
+```text
+Phone microphone
+      |
+      |  Wi-Fi (WebSocket) - PCM 48 kHz
+      v
+Sawt+ daemon on Linux
+      |
+      |  PipeWire / PulseAudio
+      v
+Source: sawt-plus
+      |
+      v
+Meeting and recording apps
+```
+
+<!-- IMAGE SLOT: how-it-works
+     عندما تتوفر صورة توضيحية، استبدل هذا التعليق بـ:
+     <p align="center"><img src="assets/media/how-it-works.png" alt="مسار الصوت في صوت+" width="88%"></p>
+-->
+
+---
+
+<a id="controls"></a>
+
+## التحكم من أي مكان
+
+| السطح | ما يمكنك فعله |
+| --- | --- |
+| الهاتف | تشغيل الخدمة وإيقافها، ضبط مستوى الصوت، توليد رمز اقتران جديد |
+| الطرفية | `sawt status` و`sawt pair` و`sawt connect` و`sawt web` |
+| صفحة الويب | عرض الحالة والأجهزة، والتحكم في مستوى الصوت، عبر `sawt web` |
+
+صفحة الويب اختيارية وتعمل محليًا على جهازك، ولا تحتاج Node.js.
+
+<!-- IMAGE SLOT: web-ui
+     عندما تتوفر صورة صفحة الويب، استبدل هذا التعليق بـ:
+     <p align="center"><img src="assets/media/web-ui.png" alt="صفحة صوت+ المحلية" width="88%"></p>
+-->
+
+---
+
+<a id="troubleshooting"></a>
+
+## استكشاف الأخطاء
+
+| المشكلة | ما يمكنك تجربته |
+| --- | --- |
+| لا يظهر الهاتف في القائمة | تأكد أن الجهازين على نفس الشبكة، واسمح للمنفذ `8765` في الجدار الناري |
+| لا يظهر `sawt-plus` كميكروفون | تأكد أن PipeWire أو PulseAudio يعمل، ثم أعد تشغيل البرنامج |
+| رمز الاقتران مرفوض | اضغط **رمز جديد** في التطبيق، ثم أدخل الرمز الجديد |
+| الصوت متقطع | قرّب الهاتف من الراوتر، أو استخدم شبكة 5GHz إن أمكن |
+
+التفاصيل الكاملة، بما فيها أوامر التثبيت اليدوي وإعدادات الجدار الناري وUSB/ADB،
+موجودة في [دليل المستخدم المتقدّم](docs/advanced.ar.md).
+
+---
+
+<a id="faq"></a>
+
+## الأسئلة الشائعة
+
+<details>
+<summary><b>هل يحتاج صوت+ إلى إنترنت؟</b></summary>
+<br>
+لا. يعمل بالكامل داخل شبكتك المحلية، ولا يرسل الصوت إلى أي خدمة خارجية.
+</details>
+
+<details>
+<summary><b>هل يعمل على ويندوز أو ماك؟</b></summary>
+<br>
+برنامج الحاسوب مخصّص للينكس فقط. تطبيق الهاتف يعمل على أندرويد 5.0 أو أحدث.
+</details>
+
+<details>
+<summary><b>هل يحتاج الهاتف إلى روت؟</b></summary>
+<br>
+لا. يكفي منح التطبيق إذن الميكروفون عند أول تشغيل.
+</details>
+
+<details>
+<summary><b>هل يمر الصوت عبر خادم أو سحابة؟</b></summary>
+<br>
+لا. ينتقل الصوت مباشرة بين الهاتف والحاسوب عبر شبكة Wi-Fi المحلية.
+</details>
+
+<details>
+<summary><b>هل يعمل مع أي تطبيق؟</b></summary>
+<br>
+نعم. أي تطبيق يستطيع اختيار مصدر صوت من PipeWire أو PulseAudio سيرى `sawt-plus`.
+</details>
+
+<details>
+<summary><b>ماذا لو تغيّر عنوان الهاتف؟</b></summary>
+<br>
+يحاول برنامج الحاسوب إعادة اكتشاف الجهاز تلقائيًا عند فشل الاتصال. إذا استمرت
+المشكلة، أعد الاقتران من التطبيق.
+</details>
+
+<details>
+<summary><b>هل المشروع مجاني؟</b></summary>
+<br>
+نعم، مفتوح المصدر بترخيص MIT.
+</details>
+
+---
+
+<a id="advanced"></a>
+
+## للمستخدم المتقدّم
+
+كل التفاصيل التقنية موجودة في **[دليل المستخدم المتقدّم](docs/advanced.ar.md)**:
+
+- التثبيت اليدوي وسطر الأوامر الكامل.
+- إعدادات الجدار الناري والاكتشاف.
+- الاتصال عبر USB/ADB.
+- التحقق من بصمات الملفات (SHA-256).
+- خطوات إضافية لحل المشاكل.
+
+---
+
+<a id="credits"></a>
+
+## الشكر
+
+- المشروع الأصلي: [`gdzx/audiosource`](https://github.com/gdzx/audiosource).
+- [sndcpy](https://github.com/rom1v/sndcpy) للنهج الأولي في تحويل الصوت.
+
+## الترخيص
+
+MIT. راجع [LICENSE](LICENSE).
+
+---
+
+<div align="center" dir="rtl">
+  <p>صوت+ — ميكروفون لاسلكي مفتوح المصدر لحاسوب لينكس.</p>
+  <p><a href="#top">العودة إلى الأعلى</a></p>
+</div>
