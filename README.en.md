@@ -1,7 +1,7 @@
 <a id="top"></a>
 
 <div align="center">
-  <img src="assets/banner.svg" alt="Sawt+ — wireless microphone for Linux" width="100%">
+  <img src="assets/banner-en.svg" alt="Sawt+ — wireless microphone for Linux" width="100%">
   <h3>Your phone, as your computer's microphone.</h3>
   <p>
     Sawt+ turns an Android phone into a wireless microphone for a Linux computer
