@@ -22,6 +22,19 @@
 - If context is running low: stop feature work, write a complete handoff into
   `STATE.md`, and tell the user. Do not guess or redo finished work.
 
+## Delegation (required)
+
+- Delegate broad read-only work to a subagent so the main context stays small:
+  use `explore` for codebase search, reading, and analysis; `scout` for external
+  docs, dependency source, and upstream implementations; and `reviewer` to
+  inspect a diff before committing.
+- Give the subagent a precise question and ask for a concise result with
+  `file:line` references. Do not duplicate its work in the main context; read
+  only the specific files needed to decide or edit.
+- Keep edits, builds, tests, and final verification in the main agent, or use
+  `builder` after the plan is approved.
+- A single known file or a narrow lookup can be read directly.
+
 ## Project
 
 - Go client/daemon: `cmd/`, `internal/`
