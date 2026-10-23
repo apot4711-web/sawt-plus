@@ -196,7 +196,10 @@ two controls are independent: leave one at 1.00× and adjust the other. Both are
 named "مستوى الصوت" / "Input level" in the UI to avoid the technical term
 "gain" in user-facing text.
 
-## USB/ADB fallback
+## الوضع السلكي: USB/ADB
+
+- **لاسلكي**: سرعة استجابة عالية وسهولة الوصول لشبكة Wi-Fi.
+- **سلكي**: موثوقية عالية ومعرفة دقيقة بالاتصال.
 
 Wi-Fi is the intended transport, but ADB still works when both devices are on
 different networks or when Wi-Fi is unreliable.

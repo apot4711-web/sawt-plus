@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sawt+ logo concepts</title>
+<style>
+  :root { color-scheme: dark; --navy:#0B1220; --panel:#131D31; --text:#E6EDF7; --muted:#9FB0C7; --line:#243349; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:32px; background:var(--navy); color:var(--text);
+         font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1 { margin:0 0 8px; font-size:28px; }
+  p.lead { margin:0 0 28px; color:var(--muted); max-width:70ch; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:18px; }
+  .card h2 { margin:0 0 4px; font-size:18px; }
+  .card p { margin:0 0 14px; color:var(--muted); font-size:14px; }
+  .stage { border-radius:14px; padding:22px; display:flex; gap:18px; align-items:center; justify-content:center; }
+  .dark { background:var(--navy); }
+  .light { background:#F8FAFC; }
+  .stage img { width:150px; height:150px; }
+  .sizes { display:flex; gap:14px; align-items:flex-end; margin-top:14px; }
+  .sizes figure { margin:0; text-align:center; color:var(--muted); font-size:12px; }
+  .sizes img { display:block; margin:0 auto 4px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  code { color:#34D399; }
+  footer { margin-top:28px; color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<h1>Sawt+ logo concepts</h1>
+<p class="lead">Five flat directions for review. None of these is applied to the app yet. Pick one, ask for edits, or mix elements. The mark is shown on the dark and light surfaces used by the project.</p>
+
+<div class="grid">
+  <section class="card">
+    <h2>A. Sad+ (ص+)</h2>
+    <p>Arabic-first monogram: the letter Sad with a plus. The strongest local identity.</p>
+    <div class="row">
+      <div class="stage dark"><img src="01-sad-plus.svg" alt="Sad plus on dark"></div>
+      <div class="stage light"><img src="01-sad-plus.svg" alt="Sad plus on light"></div>
+    </div>
+    <div class="sizes"><figure><img src="01-sad-plus.svg" width="48" height="48" alt="">48</figure><figure><img src="01-sad-plus.svg" width="72" height="72" alt="">72</figure><figure><img src="01-sad-plus.svg" width="96" height="96" alt="">96</figure></div>
+  </section>
+
+  <section class="card">
+    <h2>B. Plus Wave</h2>
+    <p>Name-driven: a plus whose horizontal arm is an audio wave. No microphone.</p>
+    <div class="row">
+      <div class="stage dark"><img src="02-plus-wave.svg" alt="Plus wave on dark"></div>
+      <div class="stage light"><img src="02-plus-wave.svg" alt="Plus wave on light"></div>
+    </div>
+    <div class="sizes"><figure><img src="02-plus-wave.svg" width="48" height="48" alt="">48</figure><figure><img src="02-plus-wave.svg" width="72" height="72" alt="">72</figure><figure><img src="02-plus-wave.svg" width="96" height="96" alt="">96</figure></div>
+  </section>
+
+  <section class="card">
+    <h2>C. Ripple+</h2>
+    <p>A plus emitting two sound ripples: wireless, local, and minimal.</p>
+    <div class="row">
+      <div class="stage dark"><img src="03-ripple-plus.svg" alt="Ripple plus on dark"></div>
+      <div class="stage light"><img src="03-ripple-plus.svg" alt="Ripple plus on light"></div>
+    </div>
+    <div class="sizes"><figure><img src="03-ripple-plus.svg" width="48" height="48" alt="">48</figure><figure><img src="03-ripple-plus.svg" width="72" height="72" alt="">72</figure><figure><img src="03-ripple-plus.svg" width="96" height="96" alt="">96</figure></div>
+  </section>
+
+  <section class="card">
+    <h2>D. Mic+ (conservative)</h2>
+    <p>An evolved microphone: no circle, flatter geometry, plus as the base. Keeps instant recognition.</p>
+    <div class="row">
+      <div class="stage dark"><img src="04-mic-plus.svg" alt="Mic plus on dark"></div>
+      <div class="stage light"><img src="04-mic-plus.svg" alt="Mic plus on light"></div>
+    </div>
+    <div class="sizes"><figure><img src="04-mic-plus.svg" width="48" height="48" alt="">48</figure><figure><img src="04-mic-plus.svg" width="72" height="72" alt="">72</figure><figure><img src="04-mic-plus.svg" width="96" height="96" alt="">96</figure></div>
+  </section>
+
+  <section class="card">
+    <h2>E. S-Wave</h2>
+    <p>An S-shaped sound ribbon with a plus. Global, distinctive, and close to the name Sawt.</p>
+    <div class="row">
+      <div class="stage dark"><img src="05-s-wave.svg" alt="S wave on dark"></div>
+      <div class="stage light"><img src="05-s-wave.svg" alt="S wave on light"></div>
+    </div>
+    <div class="sizes"><figure><img src="05-s-wave.svg" width="48" height="48" alt="">48</figure><figure><img src="05-s-wave.svg" width="72" height="72" alt="">72</figure><figure><img src="05-s-wave.svg" width="96" height="96" alt="">96</figure></div>
+  </section>
+</div>
+
+<footer>Files: <code>assets/logo-concepts/</code> · preview sheets: <code>preview-dark.png</code> and <code>preview-light.png</code></footer>
+</body>
+</html>

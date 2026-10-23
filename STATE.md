@@ -1,5 +1,258 @@
 # Project State
 
+## Session 27 (2026-10-23) — Sawt+ logo concepts (review pending)
+
+- Goal: replace the microphone-in-a-disc launcher mark with a flat,
+  single-layer logo; the user is exploring ideas from the name and Arabic
+  script.
+- Constraints: no inner disc or nested background; the mic is allowed but
+  overused; palette is navy `#0B1220`, emerald `#34D399`, cyan `#22D3EE`,
+  light `#E6EDF7`; Android adaptive icons still need one background layer; do
+  not change app assets or publish until the user approves; no downloads or
+  commits.
+- Done: five transparent SVGs under `assets/logo-concepts/`:
+  `01-sad-plus.svg` (Sad+ / ص+ monogram; glyph path from Droid Arabic Kufi
+  via `pango-view`; plus placed outside for 48 px legibility),
+  `02-plus-wave.svg`, `03-ripple-plus.svg`, `04-mic-plus.svg`,
+  `05-s-wave.svg`.
+- Previews: `preview-dark.png`, `preview-light.png`, and `preview.html`
+  (1200x440 contact sheet with 80/56/48 px rows). Verified visually; the size
+  labels no longer overlap.
+- No app icon or resource files were changed. The working tree has the
+  untracked `assets/logo-concepts/` directory plus this `STATE.md` update.
+- Next: the user picks a concept or requests edits. After approval, implement
+  the adaptive foreground/monochrome/legacy icons, rebuild, and only release
+  if explicitly requested.
+
+## Session 26 (2026-10-23) — release Sawt+ 2.0.2 (brand identity)
+
+- Goal (user request): build the updated app and publish it to GitHub Releases.
+- Version: `versionCode 3`, `versionName 2.0.2`.
+- Prepared:
+  - `app/build.gradle` bumped to code 3 / name 2.0.2.
+  - Rebuilt the debug APK offline; replaced
+    `apk/sawt-plus-2.0.1.apk` with `apk/sawt-plus-2.0.2.apk` (exactly one APK).
+    APK 5,976,332 bytes, SHA-256
+    `d1e1ba564e11fe35be14422eef7273da0783970e54fbb1aeb19b28162122e61f`.
+    Verified: app id `com.sawtplus.app`, versionCode 3, versionName 2.0.2,
+    minSdk 21, targetSdk 35, label `Sawt+`, same debug cert
+    `b3504a9678cd616de0bbdc28f8a3b1c2ff617914fb8b089b39ff617738aa9e78`;
+    `colorPrimary` has light `#0f766e` / night `#34d399`.
+  - Rebuilt `bin/sawt-linux-amd64` from the current tree
+    (`CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w"`),
+    9,056,418 bytes, SHA-256
+    `39689b053d62d2dec049203168fafefc02f94b8241094b6e0976aaba60dcb805`;
+    still prints `sawt 2.0.0` and now embeds the Sawt+ web UI/theme toggle.
+  - Regenerated `SHA256SUMS`; `sha256sum -c` passes.
+  - Added bilingual `docs/release-notes/v2.0.2.md` (EN + AR, no emojis).
+  - Updated the artifact name in `AGENTS.md`.
+- Verified: `./gradlew :app:assembleDebug --offline` BUILD SUCCESSFUL;
+  `go build ./...` and `go test ./...` green; `git diff --cached --check` clean.
+- Reviewer pass: found the release-notes claim that the PC side was unchanged;
+  fixed to say the protocol/Go version are unchanged while the embedded web UI
+  was updated. Re-verified hashes, badging, cert, and the `sawtplus-theme`
+  marker.
+- Publish: commit `5e4d2a1` (`release: Sawt+ 2.0.2 with brand palette and icon`)
+  pushed to `origin/main`; annotated tag `v2.0.2` pushed. Workflow run
+  `39959615132` completed successfully:
+  <https://github.com/apot4711-web/sawt-plus/actions/runs/39959615132>
+- Release `v2.0.2` is public with four assets; server-computed SHA-256 digests
+  match the local files:
+  - `sawt-plus.apk` 5,976,332 bytes,
+    `d1e1ba564e11fe35be14422eef7273da0783970e54fbb1aeb19b28162122e61f`
+  - `sawt-linux-amd64` 9,056,418 bytes,
+    `39689b053d62d2dec049203168fafefc02f94b8241094b6e0976aaba60dcb805`
+  - `sawt-plus-source.zip` 305,694 bytes,
+    `0c5f71f2057105fb69af14e2898a7724523f81a96e4f4aae03bd22cf55d883a8`
+  - `SHA256SUMS` 250 bytes.
+  Release URL: <https://github.com/apot4711-web/sawt-plus/releases/tag/v2.0.2>
+- Not done: the 2.0.2 APK was not installed on a phone (ask before `adb
+  install`); no visual device check yet. `STATE.md` stays local/gitignored.
+
+## Session 25 (2026-10-23) — phase 3: Android palette and launcher icon
+
+- Done (source first; committed and pushed at the end, no artifact
+  replacement, no installs):
+  - `values/colors.xml`: full light Sawt+ palette (primary `#0F766E`,
+    secondary `#0E7490`, surface `#F8FAFC`, containers `#FFFFFF`..`#D1DDEB`,
+    onSurface `#0F172A`, onSurfaceVariant `#475569`, outline `#64748B` /
+    outlineVariant `#CBD5E1`, error pair).
+  - `values-night/colors.xml`: dark palette (primary `#34D399`, secondary
+    `#22D3EE`, surface `#0B1220`, containers `#080E19`..`#22314F`, onSurface
+    `#E6EDF7`, onSurfaceVariant `#9FB0C7`, outline `#3B4A63` /
+    outlineVariant `#243349`, error pair).
+  - `values/styles.xml`: `AppTheme` now maps every M3 color attr
+    (`colorPrimary`..`colorErrorContainer`, surface container levels, outline,
+    inverse) to the new resources while keeping
+    `Theme.Material3.DayNight.NoActionBar`. Window/content backgrounds use
+    `?attr/colorSurface`; status/navigation bars use a new dark navy
+    `colorSystemBar` (`#0B1220`) so the white system icons stay legible on
+    API 21–34. `Widget.Sawt.Card` is unchanged
+    (`?attr/colorSurfaceContainer`).
+  - `MainActivity.applySystemBarAppearance()` runs after `setContentView`.
+    On API 35+ (forced edge-to-edge, where `statusBarColor` is ignored) it sets
+    light status/navigation icon appearance from the current night mode via
+    `WindowInsetsControllerCompat`; below 35 the navy bars keep white icons.
+  - DynamicColors behavior was already correct in
+    `MainActivity.java:88-90` (applied only when the saved theme is `system`);
+    the palette definitions do not block it.
+  - Launcher icon: background is now `#0B1220`
+    (`values/ic_launcher_background.xml`); `drawable/ic_launcher_foreground.xml`
+    is a mint/cyan microphone (`#34D399` capsule, `#22D3EE` stand) on a
+    `#131D31` disc; new `drawable/ic_launcher_monochrome.xml`; both
+    `mipmap-anydpi-v26/ic_launcher*.xml` include `<monochrome>`.
+  - Regenerated all 10 legacy raster icons (mdpi 48 .. xxxhdpi 192, square and
+    round) locally with ImageMagick 7 + Librsvg 2.62 from temporary SVGs in
+    `/tmp/opencode/sawt-icons/`; no downloads.
+- Verified:
+  - `source .toolchain/env.sh && ./gradlew :app:assembleDebug --offline`
+    -> BUILD SUCCESSFUL.
+  - `aapt2 dump resources` on the debug APK shows both configs, e.g.
+    `colorPrimary` `#ff0f766e` (default) / `#ff34d399` (night),
+    `colorSurface` `#fff8fafc` / `#ff0b1220`,
+    `ic_launcher_background` `#ff0b1220`; badging still `2.0.1`/code 2.
+  - Contrast ratios (WCAG): light onPrimary/primary 5.47:1, light
+    primary/surface 5.23:1, dark text/surface 15.89:1, dark muted/surface
+    8.48:1, dark onPrimary/primary 8.47:1; all >= 5.2:1.
+  - `rg` finds no remaining `#DC2534`/`#DA2534`; `git diff --check` clean.
+  - A `reviewer` pass was run before committing. It found the untracked
+    monochrome drawable and the light-system-bar icon contrast issue; both are
+    fixed (the new `ic_launcher_monochrome.xml` is included in `f18ed15`).
+    Remaining low-priority notes left unchanged: `colorTertiary*` roles are not
+    mapped (unused by current layouts), and the dark `colorOutline`/`#3B4A63`
+    is below WCAG 3:1 for component boundaries (the palette was user-approved).
+  - Not run: Gradle lint (known offline `lint-gradle` gap), Go build/tests (no
+    Go changes), device/emulator rendering, installs.
+- Committed/pushed (user requested "update GitHub"):
+  - `735bd6d` `feat(ui): apply Sawt+ palette and persisted theme toggle` for
+    `internal/web/dist/index.html` (phase 2).
+  - `f18ed15` `feat(android): apply Sawt+ palette and launcher icon` for the
+    Android palette, system-bar fix, and launcher icon (phase 3), including the
+    new `ic_launcher_monochrome.xml`.
+  - Pushed `54af86b..f18ed15` to `origin/main`. `STATE.md` is gitignored and was
+    not committed. `apk/` and `bin/` were not replaced.
+- Next / blocked:
+  - Visual check on a device or emulator is still pending; ask before
+    `adb install`.
+  - Do not replace `apk/sawt-plus-2.0.1.apk` or `bin/sawt-linux-amd64` unless
+    requested.
+
+Resume prompt for the next session:
+
+> Read `AGENTS.md` and `STATE.md` first. Session 24 phases 1–2 and session 25
+> phase 3 (Android palette + launcher icon) are done, verified offline, and
+> pushed to `origin/main` (`735bd6d`, `f18ed15`). Next: visual check of the app
+> themes/icons on a device, then the remaining low-priority notes. Ask before
+> installs; keep changes inside the repo and do not replace `apk/` or `bin/`.
+
+## Session 24 (2026-10-23) — brand identity plan and delegation rule
+
+- Goal: adopt the README banner palette as the visual identity for the Android
+  app, its launcher icon, and the local web UI, with coherent light and dark
+  themes and no emojis.
+- Decisions confirmed by the user:
+  - Android keeps the System/Light/Dark setting with System as the default.
+    Material You dynamic colors stay enabled in System mode only; explicit
+    Light/Dark use the fixed Sawt+ palette.
+  - The web UI gets a dark/light toggle with dark as the default and the choice
+    persisted in `localStorage`.
+  - Source changes plus build verification only for now. Do not replace
+    `apk/sawt-plus-2.0.1.apk` or `bin/sawt-linux-amd64` and do not bump the
+    version.
+  - Keep READMEs emoji-free. Do not move the badges; the reported "+" issue is
+    the bidi rendering of `Sawt+` inside Arabic text.
+- Palette to use (shared by the app and the web UI):
+  - Dark: surface `#0B1220`, surface-container-low `#0F172A`, containers
+    `#131D31`..`#22314F`, primary `#34D399`, secondary `#22D3EE`,
+    text `#E6EDF7`, muted `#9FB0C7`, outline `#243349`/`#3B4A63`.
+  - Light: surface `#F8FAFC`/`#FFFFFF`, containers `#F1F5F9`..`#D1DDEB`,
+    primary `#0F766E`, secondary `#0E7490`, text `#0F172A`, muted `#475569`,
+    outline `#CBD5E1`/`#64748B`.
+  - Core text/background pairs are at least 5.3:1 contrast.
+- Planned work:
+  - README (phase 1, done): `assets/banner-ar.svg` (mirrored layout,
+    `Sawt+` LTR-isolated, Arabic tagline below it) and
+    `assets/banner-en.svg`; subtle SMIL waveform animation; every `Sawt+` in
+    Arabic text isolated with `<bdi>`/LTR; image-slot comments kept.
+  - Web (phase 2, done): palette, dark default, toggle and persistence are
+    implemented and verified; see "Phase 2 results" below.
+  - Android (phase 3, next): add light colors in
+    `app/src/main/res/values/colors.xml` and dark colors in
+    `values-night/colors.xml`, map them to Material 3 attrs in `styles.xml`,
+    keep the `DynamicColors` call for System mode, and replace the red launcher
+    icon (`#DC2534`) with the navy/emerald identity. Update the adaptive
+    foreground and regenerate all legacy and round PNG icons locally with
+    librsvg/ImageMagick. Build with
+    `./gradlew :app:assembleDebug --offline`.
+  - Future screenshots: when the user supplies them, add them under
+    `assets/media/` and optionally convert them to GIF/WebP.
+- Added a "Delegation (required)" section to `AGENTS.md`: use `explore` for
+  broad read-only codebase work, `scout` for external sources, and `reviewer`
+  for diff review, without duplicating their work in the main context.
+- Phase 1 results (2026-10-23, docs/assets only):
+  - Added `assets/banner-ar.svg`: 1200x280, mirrored layout (mic/brand right,
+    waveform left), `Sawt+` with `direction="ltr" unicode-bidi="isolate"`,
+    Arabic tagline `ميكروفون لاسلكي لحاسوب لينكس`, and subtle SMIL animation.
+  - Added `assets/banner-en.svg`: the English banner with the same animation.
+    `assets/banner.svg` is untouched for compatibility.
+  - `README.md:4` now uses `banner-ar.svg` with Arabic-only alt text;
+    `README.en.md:4` uses `banner-en.svg`; `README.md:64` wraps `Sawt+` in
+    `<bdi dir="ltr"><strong>…</strong></bdi>`.
+  - Verified: both SVGs parse as XML; ImageMagick 7 (RSVG delegate) renders
+    both at 1200x280; no emoji in either README; all non-comment relative
+    images and all relative links resolve; `git diff --check` clean.
+  - Not run: Go build/tests and Gradle (no source changes).
+  - Phase 2 results (2026-10-23, web UI only):
+    - `internal/web/dist/index.html`: replaced the purple Material 3 tokens
+      with the Sawt+ palette. Dark is now the CSS default (`:root`), and
+      `:root[data-theme="light"]` holds the light palette; the
+      `prefers-color-scheme` block was removed.
+    - Added a `themeBtn` icon button next to `langBtn` (sun/moon sprite
+      symbols `i-sun`/`i-moon`), defaulting to dark. The choice is persisted in
+      `localStorage["sawtplus-theme"]`; a small head script applies the light
+      attribute before paint to avoid a flash.
+    - Added `lightMode`/`darkMode` labels in Arabic and English; `applyTheme()`
+      runs from `applyLanguage()` so the aria-label/title/icon stay translated.
+    - Verified: extracted inline JS passes `node --check`; core contrast pairs
+      are >= 5.47:1 (dark text 15.9:1, light primary button 5.47:1);
+      `go build ./...` green. No Gradle run.
+  - Published (user-approved): `abb43ee` (delegation rules in `AGENTS.md`) and
+    `54af86b` (banners + README), pushed to `origin/main`
+    (`8b72468..54af86b`). `STATE.md` stayed local/uncommitted.
+- Next: phase 3 (Android colors/icons) completed in session 25. Ask before
+  committing or publishing.
+
+Resume prompt for the next session:
+
+> Read `AGENTS.md` and `STATE.md` first. Session 24 phases 1 and 2 are done and
+> verified (README banners, web palette + theme toggle); continue with phase 3
+> (Android colors/icons). Delegate broad read-only work to
+> `explore`/`scout` and do not duplicate it. Keep changes inside the repo, do
+> not replace `apk/` or `bin/`, and do not commit until I ask.
+
+## Session 23 (2026-10-23) — Arabic-first README redesign
+
+- Done: made Arabic the primary README, following the MCP-Agent language-switch
+  pattern and Konveyor-style presentation (no emojis, per user request).
+  - `README.md` is now the full Arabic README (was `README.ar.md`).
+  - `README.en.md` is the full English README (was `README.md`).
+  - `docs/advanced.md` now links to `../README.en.md`; `docs/advanced.ar.md`
+    links to `../README.md`.
+- Layout: centered hero with `assets/banner.svg`, language switch in the middle,
+  shields.io badges, quick-link TOC, requirements/controls/troubleshooting
+  tables, FAQ `<details>`, footer, and back-to-top anchors. No emojis.
+- Added invisible `<!-- IMAGE SLOT: ... -->` markers in both READMEs for
+  `assets/media/hero.png`, `assets/media/how-it-works.png`, and
+  `assets/media/web-ui.png`; replace the comment with the `<img>` markup when
+  the user provides the images.
+- Verified with a read-only Python check: no emoji codepoints, every rendered
+  relative link exists, every TOC anchor has a matching `id`, and
+  `assets/banner.svg` parses as XML. `git diff --check` is clean. No Go/Android
+  build needed (docs-only change).
+- Committed as `8b72468` (`docs: make README Arabic-first and redesign
+  layout`) and pushed to `origin/main` (`defe19d..8b72468`). `STATE.md` stays
+  local/gitignored and was not included in the commit.
+
 ## Session 22 (2026-10-22) — frame-based activity indicator
 
 - Goal: mark a device active from actual PCM arrivals instead of only the
@@ -148,8 +401,12 @@
 - Tests: docs-only change; no build/test run.
 - Next: none pending.
 
-Last updated: 2026-10-21 (session 15 complete — Android 5.0/API 21 support and
-the `v2.0.1` release are committed, pushed, and published). `versionCode 2` /
+Last updated: 2026-10-23 (session 27 — five logo concepts are ready in
+`assets/logo-concepts/`; waiting for the user to choose one or request edits
+before touching app icon resources).
+
+Baseline (2026-10-21): session 15 complete — Android 5.0/API 21 support and
+the `v2.0.1` release are committed, pushed, and published. `versionCode 2` /
 `versionName 2.0.1`, Base64 and runtime-permission fixes, `Map` default-method
 fixes, API-23 guards, docs, and `v2.0.1` release notes are done. Lint reports
 0 errors with no `NewApi` findings. Nothing was downloaded or installed; the
@@ -778,8 +1035,9 @@ Start a new chat in this project and send:
 ## User preferences
 
 - Communicate in Arabic.
-- README is English-first; keep `README.ar.md` as a full Arabic translation
-  with a visible language switch at the top of both files.
+- README is Arabic-first: `README.md` is the full Arabic README and
+  `README.en.md` is the full English translation, with a visible language
+  switch at the top of both files. Keep them free of emojis.
 - The project should be useful to anyone, not tied to the test phone: prioritize
   broad device compatibility (target Android 5.0 / API 21 and up).
 - Be cautious: ask before downloads, installs, or changes outside the repo.
@@ -792,8 +1050,9 @@ Start a new chat in this project and send:
 - Name the input-level control "مستوى الصوت" in the UI; avoid the technical
   word "gain" in user-facing text.
 - Android app should follow Material You 3 (Material 3) and support Arabic.
-- Workflow: the main conversation is for management/planning; use the
-  read-only `explore` subagent for wide searches so the main context lasts.
+- Workflow: the main conversation is for management/planning. Delegate broad
+  read-only work to `explore` (codebase), `scout` (external sources), and
+  `reviewer` (diffs), and do not duplicate their work in the main context.
   Start a fresh session per phase and rely on `STATE.md` as the handoff.
 - The project will be published on GitHub; remove incidental personal data
   (phone model, local IP, pairing codes, local paths). Session 8 renamed the
