@@ -1,2 +1,37 @@
 <resources>
+    <color name="colorPrimary">#34D399</color>
+    <color name="colorOnPrimary">#06251C</color>
+    <color name="colorPrimaryContainer">#0F3D2E</color>
+    <color name="colorOnPrimaryContainer">#A7F3D0</color>
+    <color name="colorPrimaryInverse">#0F766E</color>
+
+    <color name="colorSecondary">#22D3EE</color>
+    <color name="colorOnSecondary">#062A33</color>
+    <color name="colorSecondaryContainer">#0B3B47</color>
+    <color name="colorOnSecondaryContainer">#A5F3FC</color>
+
+    <color name="colorSurface">#0B1220</color>
+    <color name="colorOnSurface">#E6EDF7</color>
+    <color name="colorSurfaceVariant">#1A2740</color>
+    <color name="colorOnSurfaceVariant">#9FB0C7</color>
+    <color name="colorSurfaceInverse">#E6EDF7</color>
+    <color name="colorOnSurfaceInverse">#0B1220</color>
+    <color name="colorSurfaceDim">#080E19</color>
+    <color name="colorSurfaceBright">#22314F</color>
+    <color name="colorSurfaceContainerLowest">#080E19</color>
+    <color name="colorSurfaceContainerLow">#0F172A</color>
+    <color name="colorSurfaceContainer">#131D31</color>
+    <color name="colorSurfaceContainerHigh">#1A2740</color>
+    <color name="colorSurfaceContainerHighest">#22314F</color>
+
+    <color name="colorOutline">#3B4A63</color>
+    <color name="colorOutlineVariant">#243349</color>
+
+    <color name="colorError">#F87171</color>
+    <color name="colorOnError">#450A0A</color>
+    <color name="colorErrorContainer">#5C1A1A</color>
+    <color name="colorOnErrorContainer">#FECACA</color>
+
+    <color name="colorScrim">#000000</color>
+    <color name="colorSystemBar">#0B1220</color>
 </resources>
