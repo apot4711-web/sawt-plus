@@ -53,8 +53,12 @@ Release 2.1.2 (user-requested): `versionCode 6`, `versionName 2.1.2`,
 - `assembleRelease` ran with `-x lintVital*` because the offline cache lacks
   `lint-gradle:31.7.3`; debug build and Go tests pass.
 
-Next: commit + push `main`, tag `v2.1.2`; the GitHub Actions release workflow
-copies `apk/*.apk` and `bin/sawt-linux-amd64` and creates the release.
+Pushed `main` (`cab3b40`) and annotated tag `v2.1.2`. GitHub Actions run
+`40102859724` completed successfully and created
+<https://github.com/apot4711-web/sawt-plus/releases/tag/v2.1.2> with
+`sawt-plus.apk`, `sawt-linux-amd64`, `sawt-plus-source.zip`, and
+`SHA256SUMS`. The uploaded APK/binary hashes match the local artifacts
+(`54bbd582...` / `d56ba19d...`).
 
 ## Session 32 (2026-10-24) — diagnosis only, no code changes
 
