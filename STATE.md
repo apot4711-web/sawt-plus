@@ -1,5 +1,41 @@
 # Project State
 
+## Session 30 (2026-10-24) — release Sawt+ 2.1.0 (security release)
+
+- User asked to publish the rebuilt app to GitHub Releases.
+- Version bumped to `versionCode 4` / `versionName 2.1.0`
+  (`app/build.gradle`), and `internal/version.Version` 2.0.0 → 2.1.0 so the
+  daemon/CLI report the release version.
+- Added `docs/release-notes/v2.1.0.md` (bilingual: TLS-only Wi-Fi, ADB token
+  handshake, GPLv3, pinning, hotplug auto-connect, unpair all).
+- Verified: `go build ./...` and `go test ./...` pass; `go vet` not run.
+  `bin/sawt-linux-amd64` rebuilt static stripped (`sawt 2.1.0`,
+  9,080,994 bytes). APK rebuilt clean with repo JDK 17 (`BUILD SUCCESSFUL`);
+  `com.sawtplus.app` versionCode 4 / versionName 2.1.0, same debug cert
+  `b3504a...9e78`, 5,988,624 bytes.
+- Artifacts: `apk/sawt-plus-2.1.0.apk` (old 2.0.2 removed so
+  `apk/*.apk` stays single), updated `SHA256SUMS`:
+  apk `d5f2c2f2...b3681f4`, bin `570cc3b8...201835`.
+- Release path: commit + annotated tag `v2.1.0` + push; the GitHub Actions
+  workflow (`.github/workflows/release.yml`) creates the release from the tag.
+- Blocked: local `gh` is not authenticated; not needed because the workflow
+  uses `GITHUB_TOKEN`. SSH push to `origin` works.
+- Next: push, then verify the Actions run and the published release assets.
+
+## Session 29 (2026-10-24) — debug APK build after security commit
+
+- Problem: `:app:compileDebugJavaWithJavac` failed with
+  `jlink executable /usr/lib/jvm/java-25-openjdk/bin/jlink does not exist`.
+  Root cause: Gradle ran on the system JDK 25 (no `jlink`, Gradle 8.9 does
+  not support it) instead of the repo JDK 17; `.toolchain/env.sh` was not
+  sourced. Not a code error.
+- Fix (commands run from repo root):
+  `source .toolchain/env.sh && ./gradlew --stop && ./gradlew :app:assembleDebug --offline`
+- Result: BUILD SUCCESSFUL in 37s (32 tasks). Debug APK rebuilt at
+  `app/build/outputs/apk/debug/app-debug.apk`.
+- Next: run the full Go checks (`go build ./...`, `go test ./...`) before any
+  release; app assets/version were not changed.
+
 ## Session 28 (2026-10-24) — security fix campaign (complete)
 
 - Goal (user request + challenge): fix all 10 critical/important findings from
