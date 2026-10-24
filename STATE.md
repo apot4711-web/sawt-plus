@@ -1,5 +1,121 @@
 # Project State
 
+## Session 28 (2026-10-24) — security fix campaign (complete)
+
+- Goal (user request + challenge): fix all 10 critical/important findings from
+  the security review without introducing regressions. One subagent per
+  finding, run sequentially to avoid edit conflicts; final reviewer pass plus
+  build/test verification at the end.
+- Toolchain note: `go` is not installed here and `.toolchain/` (Android SDK)
+  is absent — asked the user for approval to download Go 1.26 (~70 MB into
+  ~/workspace/.toolchains/go) and to run scripts/setup-android.sh (~800 MB
+  into .toolchain/). Code fixes proceed now; compile verification follows
+  approval.
+- Done: I4 (Go) — WebSocket read limit 16 MB → two-stage: 64 KiB during the
+  JSON handshake, then negotiated-frame×4 clamped to a 256 KiB ceiling after
+  "ready" (internal/daemon/daemon.go). Verified by diff review; `go build`
+  pending toolchain approval.
+- Done: I3 (Go) — per-frame status broadcast storm → added
+  `broadcastStatusThrottled()` (max 1 push / 500 ms on the audio path;
+  state transitions and user actions still push immediately). Deadlock audit
+  passed (no lock held across the call at any of the 5 call sites).
+- Toolchain: Go 1.26.0 installed at ~/workspace/.toolchains/go (user
+  approved). `go build ./...`, `go vet ./...`, `go test ./...` all green
+  with fixes I4+I3 in the tree.
+- Done: I2 (Go) — brute-force protection on Pair(): per-address exponential
+  backoff (2s→60s), lockout for 5 min after 8 consecutive rejections,
+  honors the phone's retry_after hint; transport errors never throttle.
+  Added pair_throttle_test.go (6 tests, all pass). `go build`/`go vet`/
+  `go test ./...` green.
+- Done: C1 (Android, critical) — ADB socket now requires a pairing-token
+  handshake (`TOKEN <token>`) with constant-time verification before any
+  audio flows; both sides updated (AdbServer.java, TokenStore.java,
+  RecordService.java, internal/adb via daemon.go adbToken/streamADB).
+  Breaking: ADB transport now requires one prior Wi-Fi pairing. `go build`/
+  `go vet`/`go test` green; `gofmt -w` applied (whitespace-only).
+- Done: I1 (Android) — mic capture no longer dies silently: on read error,
+  running=false (truthful state), recorder released, and StreamHub retries
+  re-acquiring the mic with exponential backoff (2s→30s, max 6 attempts)
+  only while clients are connected; restarts cancelled on stop/shutdown.
+- Done: I4 (Android) — startRecording() failures are caught, recorder
+  released, running reset, and routed through the I1 restart scheduler
+  (capped at 6 attempts — proven no infinite loop); also fixed a latent
+  stall where isRunning() would lie true after a start failure.
+- Done: I3 (Android) — token revocation: settings now has "Paired devices"
+  with "Unpair all" (both locales); revoking drops live Wi-Fi + ADB sessions
+  immediately and future hellos fail closed (pair_required). Chose unpair-all
+  (not per-device) because the store keeps only token hashes, no identities.
+- Done: I2 (Android) — Wi-Fi transport is now TLS-only (wss://): new
+  TlsCertificate.java (EC P-256 self-signed cert in AndroidKeyStore, SHA-256
+  fingerprint), TlsServerFactory (TLS 1.2+ only, fail-closed), fingerprint
+  published via mDNS TXT + paired/pair_required/ready JSON + settings UI
+  (both locales); manifest usesCleartextTraffic=false. Wire contract for
+  the Go client documented in WifiServer Javadoc.
+- Done: I1 (Go) — TLS client with cert pinning: new internal/daemon/tls.go
+  (SHA-256 pinning via VerifyConnection only, TLS 1.2+, TOFU at pairing,
+  fail-closed mismatch with re-pair guidance); wss:// everywhere; CertSHA256
+  persisted per device; mDNS TXT sha256 parsed in discovery; 7 new/updated
+  tests green (build/vet/gofmt/test all pass).
+- Done: C1 (Go) — device identity pinning on rediscover: mDNS name now only
+  selects a candidate; adoption requires the candidate to present the pinned
+  TLS cert in a tokenless handshake (fail-closed; legacy unpinned entries
+  never follow mDNS). Full token-path audit in report; 8 new subtests green.
+  ALL 10 SECURITY FIXES COMPLETE.
+- Done: license switched MIT → GPLv3 (user-approved 2026-10-24). Verified:
+  gdzx/audiosource is MIT (GPL-compatible, copyrights preserved in LICENSE);
+  scrcpy/sndcpy (Romain Vimont) are Apache-2.0 (one-way compatible with
+  GPLv3). LICENSE now = original copyright notices + official GPL-3.0 text;
+  README.md + README.en.md badges/sections updated. Not committed.
+- Done: USB hotplug auto-connect (user-approved): new
+  internal/daemon/adb_hotplug.go — 3s `adb devices` watcher; auto-connects on
+  appearance transition only when idle + AutoConnect on; paired-only
+  (explicit adb:<serial> entry, else exactly-one-paired-device rule matching
+  adbToken()); never interrupts active streams; explicit Disconnect respected;
+  10 new subtests green. ALL FEATURE WORK COMPLETE.
+- Done: FINAL REVIEW — verdict SHIPPABLE after one real Android build on
+  Fedora. Reviewer found + fixed 1 genuine blocker: X500Principal("CN=Sawt+
+  ...") throws IllegalArgumentException ('+' is reserved in RFC 2253 DNs) —
+  would have prevented the Wi-Fi server from starting on ANY phone; CN now
+  "SawtPlus <id>", verified with JDK. AGENTS.md stale transport docs
+  updated (wss://). Go: build/vet/gofmt/test all green (25+ new tests).
+  Android: not compilable in sandbox (pre-existing Gradle IPC failure) —
+  user must run :app:assembleDebug on Fedora (must confirm TlsServerFactory
+  vs Java-WebSocket 1.5.7). CHANGELOG.md written (2.1.0 draft).
+- Done: README framing fix (user request, pre-push): Wi-Fi was described
+  as "primary" and USB/ADB as "fallback/backup" in README.md + README.en.md
+  (intro, features table, how-it-works flow + diagram). Reworded to present
+  both as equal first-class connections. Historical release notes untouched.
+- Done: web UI toast fix (user-reported): `.toast` in
+  internal/web/dist/index.html used `inset-inline: 50%` (left+right 50% in
+  RTL = zero-width box, text overflowing a 36px strip) plus a wrong-direction
+  translateX(50%). Fixed to `left: 50%` + `translateX(-50%)` (and matching
+  hidden state) — centered bar, width fits message up to 560px. Go build OK.
+  Joins the pending push.
+- PUSHED to GitHub main (2026-10-24): commit 7e274209, 30 files — the 10
+  security fixes, USB hotplug auto-connect, GPLv3, README Wi-Fi/USB parity,
+  web toast fix, CHANGELOG.md. Verified: remote main head == 7e274209 and
+  the toast fix is present in remote index.html. Excluded as always:
+  STATE.md, AGENTS.md (private) and assets/logo-concepts/ (undecided
+  concepts; preview PNGs are binary and cannot go in a snapshot push).
+- Still open: Android build on Fedora (user's machine, ~/c/audiosource-plus).
+  User pulled 7e274209 there (HEAD == origin/main, confirmed). First build
+  `./gradlew :app:assembleDebug` FAILED at :app:compileDebugJavaWithJavac:
+  Gradle ran on Java 25 (/usr/lib/jvm/java-25-openjdk) whose install lacks
+  `jlink`, needed by AGP 8.7.3 to build the androidJdkImage from
+  core-for-system-modules.jar. Project requires JDK 17
+  (sourceCompatibility/targetCompatibility VERSION_17). Fix: install
+  java-17-openjdk-devel and run with JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+  (or set org.gradle.java.home in ~/.gradle/gradle.properties). Failure is
+  pre-compilation: it says NOTHING about the app code or the TLS CN fix.
+  User will have their local Fedora agent fix the build. No APK built yet,
+  so nothing uploaded to Releases. Release 2.1.0 (with APK) waits on that
+  build.
+- No commits (per AGENTS.md rule). NOTE 2026-10-24: user EXPLICITLY
+  authorized pushing STATE.md itself to GitHub (after being warned it
+  becomes public), so their local Fedora agent can pull the current
+  status. This is a one-time authorization for STATE.md only; AGENTS.md
+  stays unpushed.
+
 ## Session 27 (2026-10-23) — Sawt+ logo concepts (review pending)
 
 - Goal: replace the microphone-in-a-disc launcher mark with a flat,
@@ -23,6 +139,40 @@
 - Next: the user picks a concept or requests edits. After approval, implement
   the adaptive foreground/monochrome/legacy icons, rebuild, and only release
   if explicitly requested.
+- Update (2026-10-24, session 28): user asked for a NEW direction — no mic
+  (cliché); combine three elements: Arabic ص from the name + sound waves +
+  plus. Three new concepts built under `assets/logo-concepts/`:
+  `06-wave-sad.svg` («الصاد الموجية»: Kufi ص vector path, wave arcs from
+  the bowl, plus above the ascender), `07-speaking-wave.svg` («الموجة
+  الناطقة»: 9 waveform bars, tallest replaced by plus), `08-sonic-plus.svg`
+  («الزائد الصوتي»: plus with sine-wave vertical stroke + ص-bowl smile
+  curve). Previews: `preview2-dark.png` / `preview2-light.png`. Agent
+  assessment: 07 reads best at small sizes; 06 most distinctive.
+- Update (2026-10-24, session 28, later): user rejected compositional logos
+  as uncreative — wants TRUE FUSION (one inseparable mark). Built
+  `09-one-line.svg` («الخط الواحد»): a SINGLE continuous parametric stroke —
+  sine wave → Kufi squarish bowl → ascender from bowl's right edge →
+  self-crossing plus at top. One path, one color (#34D399). Previews:
+  `preview3-dark.png` / `preview3-light.png`. Honest assessment: fusion is
+  real (inseparable); plus+waves unmistakable; ص reads stylized (needs a
+  second glance). Parametric ceiling reached; next lever = professional
+  calligraphic pass on bowl geometry.
+- Update (2026-10-24, session 28, later): user dictated their OWN design;
+  built as `10-sad-mic.svg` (+`10b` filled-mic variant): rounded square
+  (bowl of ص) with cyan plus INSIDE, U-arc attached to its left (ص's curved
+  descender), mic capsule (pill: rect + semicircle caps) nestled in the U,
+  three cyan slashes left of mic. Previews: `preview4-dark.png` /
+  `preview4-light.png` (A left, B right). Reads as intended; abstract mark
+  first, ص second.
+- Update (2026-10-24, session 28, later): user gave 4 corrections on v1
+  ("خايس لكن قربت"): (1) U glued seamlessly to square (single continuous
+  form), (2) even computed spacing between U and mic, (3) left slashes
+  DELETED ("wave/earthquake/lightning"), (4) three lines moved INSIDE the
+  mic capsule as grille lines. Built `11-sad-mic-v2.svg` (stroked capsule)
+  + `11b` (filled capsule, grille as mask slits); previews
+  `preview5-dark.png` / `preview5-light.png`. Verified: seamless joint,
+  even gaps, grille reads as mic.
+- Next: user picks one of the 11 concepts or requests edits.
 
 ## Session 26 (2026-10-23) — release Sawt+ 2.0.2 (brand identity)
 
