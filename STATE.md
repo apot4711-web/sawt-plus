@@ -17,10 +17,16 @@
   `apk/*.apk` stays single), updated `SHA256SUMS`:
   apk `d5f2c2f2...b3681f4`, bin `570cc3b8...201835`.
 - Release path: commit + annotated tag `v2.1.0` + push; the GitHub Actions
-  workflow (`.github/workflows/release.yml`) creates the release from the tag.
-- Blocked: local `gh` is not authenticated; not needed because the workflow
-  uses `GITHUB_TOKEN`. SSH push to `origin` works.
-- Next: push, then verify the Actions run and the published release assets.
+  workflow (`.github/workflows/release.yml`) created the release from the tag.
+- Rebased onto `origin/main` (`1b96a0e`, remote STATE-only commit); merged the
+  remote Session 28 with local notes, renumbered local build/release sessions
+  to 29/30. Release commit `f53186b`; tag `v2.1.0` pushed.
+- Done: release published at
+  <https://github.com/apot4711-web/sawt-plus/releases/tag/v2.1.0> with
+  `sawt-plus.apk` (5,988,624), `sawt-linux-amd64` (9,080,994),
+  `sawt-plus-source.zip`, `SHA256SUMS`; APK/bin hashes match the local sums.
+  Local `gh` is still not authenticated (workflow used `GITHUB_TOKEN`).
+- Next: nothing pending for this release.
 
 ## Session 29 (2026-10-24) — debug APK build after security commit
 
