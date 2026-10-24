@@ -23,6 +23,7 @@ import (
 	"github.com/apot4711-web/sawt-plus/internal/client"
 	"github.com/apot4711-web/sawt-plus/internal/config"
 	"github.com/apot4711-web/sawt-plus/internal/daemon"
+	"github.com/apot4711-web/sawt-plus/internal/discovery"
 	"github.com/apot4711-web/sawt-plus/internal/version"
 )
 
@@ -274,21 +275,37 @@ func runDiscover(args []string) int {
 	}
 	if len(devices) == 0 {
 		fmt.Println("no devices found")
-		return 0
+	} else {
+		fmt.Printf("%-24s %-24s %-8s %-12s %s\n", "NAME", "ADDRESS", "TRANSPORT", "VERSION", "PAIRING")
+		for _, dev := range devices {
+			pairing := ""
+			if dev.Pairing {
+				pairing = "required"
+			}
+			transport := dev.Transport
+			if transport == "" {
+				transport = "wifi"
+			}
+			fmt.Printf("%-24s %-24s %-8s %-12s %s\n", truncate(dev.Label(), 24), dev.Address, transport, dev.Version, pairing)
+		}
 	}
-	fmt.Printf("%-24s %-24s %-8s %-12s %s\n", "NAME", "ADDRESS", "TRANSPORT", "VERSION", "PAIRING")
-	for _, dev := range devices {
-		pairing := ""
-		if dev.Pairing {
-			pairing = "required"
-		}
-		transport := dev.Transport
-		if transport == "" {
-			transport = "wifi"
-		}
-		fmt.Printf("%-24s %-24s %-8s %-12s %s\n", truncate(dev.Label(), 24), dev.Address, transport, dev.Version, pairing)
+	if adb.Available() && !hasADBDevice(devices) && adb.USBADBInterfacePresent() {
+		fmt.Fprintln(os.Stderr, "USB: an ADB interface is attached but adb lists no device; "+
+			"check \"Allow USB debugging\" on the phone (or run: adb kill-server && adb start-server)")
+	}
+	if warning := daemon.WifiPowerSaveWarning(); warning != "" {
+		fmt.Fprintln(os.Stderr, warning)
 	}
 	return 0
+}
+
+func hasADBDevice(devices []discovery.Device) bool {
+	for _, dev := range devices {
+		if dev.Transport == "adb" || strings.HasPrefix(dev.Address, "adb:") {
+			return true
+		}
+	}
+	return false
 }
 
 // ---------------------------------------------------------------------------
@@ -377,7 +394,14 @@ func parsePairURI(raw string) (string, string, error) {
 
 func runConnect(args []string) int {
 	target := ""
-	for _, a := range args {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		// Skip the value of flags that take one, otherwise "connect
+		// --timeout 20s" uses "20s" as the device address.
+		if a == "--timeout" || a == "-t" {
+			i++
+			continue
+		}
 		if strings.HasPrefix(a, "-") {
 			continue
 		}
@@ -395,6 +419,9 @@ func runConnect(args []string) int {
 	if err != nil {
 		log.Error("daemon", "err", err)
 		return 1
+	}
+	if warning := daemon.WifiPowerSaveWarning(); warning != "" {
+		fmt.Fprintln(os.Stderr, warning)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout+15*time.Second)
 	defer cancel()
@@ -657,14 +684,20 @@ func runADB(args []string) int {
 
 	switch args[0] {
 	case "devices", "ls":
-		m := adb.New(serialFlag(args[1:]))
-		devices, err := m.Devices(ctx)
+		devices, restarted, err := adb.DevicesFresh(ctx)
 		if err != nil {
 			log.Error("adb devices", "err", err)
 			return 1
 		}
+		if restarted {
+			fmt.Fprintln(os.Stderr, "adb server was stale; restarted it")
+		}
 		for _, d := range devices {
 			fmt.Printf("%-24s %-12s %s\n", d.Serial, d.State, d.Model)
+		}
+		if len(devices) == 0 && adb.USBADBInterfacePresent() {
+			fmt.Fprintln(os.Stderr, "USB: an ADB interface is attached but adb lists no device; "+
+				"check \"Allow USB debugging\" on the phone")
 		}
 		return 0
 	case "pair":

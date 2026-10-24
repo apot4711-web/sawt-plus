@@ -7,10 +7,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -148,6 +151,104 @@ func (m *Manager) Grant(ctx context.Context, pkg string) error {
 func (m *Manager) StartApp(ctx context.Context, pkg string) error {
 	_, err := m.run(ctx, "shell", "am", "start", "-n", pkg+"/.MainActivity")
 	return err
+}
+
+// AppRunning reports whether the package has a live process on the device.
+// Callers use it to avoid relaunching the UI on every reconnect attempt: an
+// `am start` on each retry stacks activities and yanks the user back to the
+// app every few seconds.
+func (m *Manager) AppRunning(ctx context.Context, pkg string) bool {
+	out, err := m.run(ctx, "shell", "pidof", pkg)
+	return err == nil && strings.TrimSpace(out) != ""
+}
+
+// RestartServer restarts the local adb server. It is the standard remedy for
+// a stale server that reports no devices while the phone's USB ADB interface
+// is clearly attached. The caller decides when this is safe.
+func RestartServer(ctx context.Context) error {
+	if _, err := exec.LookPath("adb"); err != nil {
+		return errors.New("adb not found")
+	}
+	// Recovery needs a little room even when the caller passed a short scan
+	// deadline; it is still bounded so a hung adb cannot stall shutdown.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = exec.CommandContext(ctx, "adb", "kill-server").Run()
+	cmd := exec.CommandContext(ctx, "adb", "start-server")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return fmt.Errorf("adb start-server: %s", msg)
+	}
+	return nil
+}
+
+// USBADBInterfacePresent reports whether a USB interface with the Android ADB
+// class triplet (class ff, subclass 42, protocol 01) is present on this host.
+// It reads sysfs only, so it works without root and without resolving devices.
+func USBADBInterfacePresent() bool {
+	classes, err := filepath.Glob("/sys/bus/usb/devices/*/*/bInterfaceClass")
+	if err != nil {
+		return false
+	}
+	for _, classPath := range classes {
+		if readSysAttr(classPath) != "ff" {
+			continue
+		}
+		dir := filepath.Dir(classPath)
+		if readSysAttr(filepath.Join(dir, "bInterfaceSubClass")) == "42" &&
+			readSysAttr(filepath.Join(dir, "bInterfaceProtocol")) == "01" {
+			return true
+		}
+	}
+	return false
+}
+
+func readSysAttr(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+const staleRecoveryInterval = 2 * time.Minute
+
+var staleRecovery struct {
+	sync.Mutex
+	last time.Time
+}
+
+// DevicesFresh lists devices and heals the classic stale-server case: a USB
+// ADB interface is attached but `adb devices` is empty. It restarts the local
+// adb server once, at most every staleRecoveryInterval, and retries. The
+// returned bool reports that a restart was performed.
+func DevicesFresh(ctx context.Context) ([]Device, bool, error) {
+	m := New("")
+	devices, err := m.Devices(ctx)
+	if err != nil || len(devices) > 0 || !USBADBInterfacePresent() {
+		return devices, false, err
+	}
+	staleRecovery.Lock()
+	if time.Since(staleRecovery.last) < staleRecoveryInterval {
+		staleRecovery.Unlock()
+		return devices, false, nil
+	}
+	staleRecovery.last = time.Now()
+	staleRecovery.Unlock()
+	if err := RestartServer(ctx); err != nil {
+		return devices, false, err
+	}
+	// The caller's scan deadline may already be exhausted by the restart, so
+	// give the retry its own short budget.
+	retryCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	devices, err = m.Devices(retryCtx)
+	return devices, true, err
 }
 
 // Forward opens a local TCP port that forwards to the app's abstract socket.

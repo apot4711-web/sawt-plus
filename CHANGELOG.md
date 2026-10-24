@@ -1,3 +1,17 @@
+# Sawt+ 2.1.2 — Reliability fixes
+
+- Stop Service no longer throws `NetworkOnMainThreadException`: TLS/WebSocket
+  close and mDNS teardown now run on a transport worker.
+- Stop then Start quickly no longer fails with `Address already in use`: the
+  ADB abstract socket is released immediately, and a restarted service waits
+  for the previous teardown before rebinding.
+- The ADB fallback no longer opens `MainActivity` on every retry (the ~20 s
+  relaunch loop). It starts the app only when the process is not running, and
+  `MainActivity` is `singleTop`.
+- Fixed `stats` arriving before `ready` for new Wi-Fi clients.
+- Stale adb server auto-recovery, a USB/ADB discovery hint, and a Wi-Fi
+  power-save warning.
+
 # Sawt+ 2.1.0 — Security release
 
 ## ⚠️ BREAKING — update the app and the PC binary together

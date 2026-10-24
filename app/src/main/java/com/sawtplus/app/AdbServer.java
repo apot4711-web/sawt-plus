@@ -2,6 +2,7 @@ package com.sawtplus.app;
 
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
+import android.net.LocalSocketAddress;
 import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
@@ -47,20 +48,45 @@ final class AdbServer extends Thread {
 
     @Override
     public void run() {
-        try {
-            serverSocket = new LocalServerSocket(SOCKET_NAME);
-            Log.i(TAG, "ADB server listening on @sawt-plus");
-        } catch (IOException e) {
-            Log.e(TAG, "ADB LocalServerSocket", e);
-            ServiceState.error = "ADB socket: " + e.getMessage();
+        // Closing a LocalServerSocket does not wake a thread blocked in
+        // accept() on Linux, and the abstract name stays bound until that
+        // accept() returns. A restart can therefore briefly race the previous
+        // instance's teardown; retry for up to ~2 s instead of giving up.
+        LocalServerSocket server = null;
+        for (int attempt = 0; running.get() && attempt < 20; attempt++) {
+            try {
+                server = new LocalServerSocket(SOCKET_NAME);
+                break;
+            } catch (IOException e) {
+                if (!running.get()) {
+                    return;
+                }
+                if (attempt == 19) {
+                    Log.e(TAG, "ADB LocalServerSocket", e);
+                    ServiceState.error = "ADB socket: " + e.getMessage();
+                    return;
+                }
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException interrupted) {
+                    return;
+                }
+            }
+        }
+        if (server == null) {
             return;
         }
+        serverSocket = server;
+        Log.i(TAG, "ADB server listening on @sawt-plus");
 
         while (running.get()) {
             LocalSocket socket = null;
             StreamHub.Sink sink = null;
             try {
-                socket = serverSocket.accept();
+                socket = server.accept();
+                if (!running.get()) {
+                    break;
+                }
                 clientSocket = socket;
 
                 // Authenticate before any audio flows: the abstract socket is
@@ -165,9 +191,35 @@ final class AdbServer extends Thread {
     }
 
     void shutdown() {
+        Log.i(TAG, "ADB server shutdown requested");
         running.set(false);
         closeServerSocket();
+        dropClient();
+        // Wake a pending accept() with a throwaway connection so the abstract
+        // name is released before a restarted service tries to bind it.
+        wakeAccept();
         interrupt();
+        try {
+            join(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /** Connects once to @sawt-plus and closes; the server side discards it. */
+    private void wakeAccept() {
+        LocalSocket wake = new LocalSocket();
+        try {
+            wake.connect(new LocalSocketAddress(
+                    SOCKET_NAME, LocalSocketAddress.Namespace.ABSTRACT));
+        } catch (IOException ignored) {
+            // The name was already released; nothing to wake.
+        } finally {
+            try {
+                wake.close();
+            } catch (IOException ignored) {
+            }
+        }
     }
 
     /**
@@ -179,6 +231,16 @@ final class AdbServer extends Thread {
     void dropClient() {
         LocalSocket socket = clientSocket;
         if (socket != null) {
+            // close() alone does not always wake a thread blocked in read() on
+            // Linux; shutdown() makes the pending read return immediately.
+            try {
+                socket.shutdownInput();
+            } catch (IOException ignored) {
+            }
+            try {
+                socket.shutdownOutput();
+            } catch (IOException ignored) {
+            }
             try {
                 socket.close();
             } catch (IOException ignored) {
@@ -192,6 +254,7 @@ final class AdbServer extends Thread {
         if (socket != null) {
             try {
                 socket.close();
+                Log.i(TAG, "ADB server socket closed");
             } catch (IOException ignored) {
             }
         }

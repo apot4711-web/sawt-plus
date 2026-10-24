@@ -19,6 +19,10 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class RecordService extends Service {
     private static final String TAG = App.TAG;
@@ -40,6 +44,25 @@ public class RecordService extends Service {
             handler.postDelayed(this, 2000);
         }
     };
+
+    // Transport setup/teardown touches sockets (TLS close, WebSocket close,
+    // mDNS, ADB) and must never run on the main thread: closing a Conscrypt
+    // TLS socket performs a close_notify write and throws
+    // NetworkOnMainThreadException inside Service.onDestroy. All transport
+    // mutations run on this single worker so start/reload/stop stay ordered.
+    private final ExecutorService transportExecutor =
+            Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "sawt-transport");
+                t.setDaemon(true);
+                return t;
+            });
+    // Static so a restarted service instance waits for the previous instance's
+    // teardown (TLS/WebSocket close, ADB abstract socket, mDNS) before binding
+    // the same ports and socket names again.
+    private static final Object transportLock = new Object();
+    /** Completed when the previous instance's teardown has fully run. */
+    private static volatile CountDownLatch pendingTeardown;
+    private volatile boolean destroyed;
 
     private StreamHub hub;
     private AdbServer adbServer;
@@ -97,27 +120,57 @@ public class RecordService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
-
-        ensureStarted();
-
-        if (ACTION_RELOAD.equals(action)) {
-            stopWifi();
-            applyTransportPreference();
-        } else if (ACTION_NEW_CODE.equals(action) && wifiServer != null) {
-            wifiServer.rotatePairingCode();
-        } else if (ACTION_UNPAIR_ALL.equals(action)) {
-            tokens.removeAll();
-            if (wifiServer != null) {
-                wifiServer.dropAllClients();
-            }
-            if (adbServer != null) {
-                adbServer.dropClient();
-            }
-            Log.i(TAG, "all pairing tokens revoked by user");
+        if (destroyed) {
+            return START_NOT_STICKY;
         }
 
-        updateNotification();
+        transportExecutor.execute(() -> runTransportAction(action));
         return START_STICKY;
+    }
+
+    private void runTransportAction(String action) {
+        if (destroyed) {
+            return;
+        }
+        CountDownLatch pending = pendingTeardown;
+        if (pending != null) {
+            try {
+                // Stop->Start in quick succession: let the old instance release
+                // port 8765 and @sawt-plus before binding them here.
+                pending.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+        try {
+            synchronized (transportLock) {
+                if (destroyed) {
+                    return;
+                }
+                ensureStarted();
+
+                if (ACTION_RELOAD.equals(action)) {
+                    stopWifi();
+                    applyTransportPreference();
+                } else if (ACTION_NEW_CODE.equals(action) && wifiServer != null) {
+                    wifiServer.rotatePairingCode();
+                } else if (ACTION_UNPAIR_ALL.equals(action)) {
+                    tokens.removeAll();
+                    if (wifiServer != null) {
+                        wifiServer.dropAllClients();
+                    }
+                    if (adbServer != null) {
+                        adbServer.dropClient();
+                    }
+                    Log.i(TAG, "all pairing tokens revoked by user");
+                }
+            }
+        } catch (RuntimeException e) {
+            Log.e(TAG, "transport action failed", e);
+            ServiceState.error = e.getMessage() == null ? e.toString() : e.getMessage();
+        }
+        handler.post(this::updateNotification);
     }
 
     private void ensureStarted() {
@@ -180,20 +233,49 @@ public class RecordService extends Service {
     @Override
     public void onDestroy() {
         Log.i(TAG, "stopping service");
+        destroyed = true;
         handler.removeCallbacks(notificationTicker);
-        stopWifi();
+        ServiceState.running = false;
+        ServiceState.reset();
+        stopForeground(true);
+        // Release the ADB abstract socket synchronously: it is a local socket
+        // (no network I/O) and holding it would make an immediate service
+        // restart fail with "Address already in use".
         if (adbServer != null) {
             adbServer.shutdown();
             adbServer = null;
         }
-        if (hub != null) {
-            hub.shutdown();
-            hub = null;
-        }
-        releaseWakeLock();
-        ServiceState.reset();
-        stopForeground(true);
+        // The rest can block on network close (TLS close_notify, WebSocket
+        // close, mDNS), so it runs on the transport worker. A restarted
+        // instance waits on this latch (and transportLock) before binding the
+        // same ports and socket names again.
+        CountDownLatch latch = new CountDownLatch(1);
+        pendingTeardown = latch;
+        transportExecutor.execute(() -> teardown(latch));
+        transportExecutor.shutdown();
         super.onDestroy();
+    }
+
+    private void teardown(CountDownLatch latch) {
+        try {
+            synchronized (transportLock) {
+                stopWifi();
+                if (adbServer != null) {
+                    adbServer.shutdown();
+                    adbServer = null;
+                }
+                if (hub != null) {
+                    hub.shutdown();
+                    hub = null;
+                }
+            }
+            releaseWakeLock();
+        } finally {
+            latch.countDown();
+            if (pendingTeardown == latch) {
+                pendingTeardown = null;
+            }
+        }
     }
 
     @Override

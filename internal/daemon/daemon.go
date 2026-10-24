@@ -119,6 +119,13 @@ type Daemon struct {
 	streamMu     sync.Mutex
 	wg           sync.WaitGroup
 
+	// adbRunningHint makes the "app already running, not relaunching" notice
+	// appear once per daemon instead of on every ADB retry.
+	adbRunningHint sync.Once
+	// powerSaveWarned limits the host Wi-Fi power-save warning to once per
+	// daemon process.
+	powerSaveWarned atomic.Bool
+
 	frames  atomic.Uint64
 	bytes   atomic.Uint64
 	dropped atomic.Uint64
@@ -421,7 +428,10 @@ func (d *Daemon) adbDevices(ctx context.Context) []discovery.Device {
 	}
 	scanCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	list, err := adb.New("").Devices(scanCtx)
+	list, restarted, err := adb.DevicesFresh(scanCtx)
+	if restarted {
+		d.Log("warn", "adb server was stale (USB ADB interface present but no devices); restarted it")
+	}
 	if err != nil {
 		return nil
 	}
@@ -755,6 +765,11 @@ func (d *Daemon) verifyRediscoverCandidate(ctx context.Context, entry *config.De
 
 func (d *Daemon) streamWiFi(ctx context.Context, entry config.DeviceEntry) error {
 	d.setState(StateConnecting, nil)
+	if !d.powerSaveWarned.Swap(true) {
+		if warning := WifiPowerSaveWarning(); warning != "" {
+			d.Log("warn", "%s", warning)
+		}
+	}
 	addr := entry.Address
 	// wss:// only, with certificate pinning. On a fingerprint mismatch the
 	// handshake aborts here — the pairing token is never sent.
@@ -1278,8 +1293,19 @@ func (d *Daemon) streamADB(ctx context.Context, serial string) error {
 	if err := m.Grant(ctx, "com.sawtplus.app"); err != nil {
 		d.Log("warn", "permissions: %v", err)
 	}
-	if err := m.StartApp(ctx, "com.sawtplus.app"); err != nil {
-		return err
+	// Only launch the app when it is not running. Starting it on every retry
+	// restarts MainActivity every ~16 s (the ADB loop interval) and pulls the
+	// user out of whatever they are doing. If the process exists but the
+	// service is stopped (user pressed Stop), launching the activity would not
+	// clear the app's userStopped flag anyway.
+	if !m.AppRunning(ctx, "com.sawtplus.app") {
+		if err := m.StartApp(ctx, "com.sawtplus.app"); err != nil {
+			return err
+		}
+	} else {
+		d.adbRunningHint.Do(func() {
+			d.Log("info", "Sawt+ app is already running; not relaunching it")
+		})
 	}
 	port, err := m.Forward(ctx, "localabstract:sawt-plus")
 	if err != nil {

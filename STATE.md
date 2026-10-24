@@ -1,6 +1,120 @@
 # Project State
 
-## Session 31 (2026-10-24) — fix 2.1.0 Wi-Fi pairing, verify 2.1.1 on device
+## Session 33 (2026-10-24) — implement fixes; ADB relaunch/restart race
+
+Approved fixes implemented:
+
+- `RecordService`: transport actions and teardown moved off the main thread
+  (`sawt-transport`); static `transportLock` + `pendingTeardown` latch makes a
+  restarted instance wait for the previous teardown; ADB socket closed
+  synchronously in `onDestroy`; `ServiceState.reset()` only in `onDestroy`.
+- `WifiServer`: main-thread `stopServer()` hands off to `sawt-wifi-stop`;
+  `sendReady` runs before `clients.put`/`hub.addSink`.
+- Manifest/`MainActivity`: `launchMode=singleTop`, `onNewIntent -> updateUi`.
+- `AdbServer`: bind retry (~2 s), `wakeAccept()` to unblock `accept()`, and
+  `shutdownInput/Output` in `dropClient()` so the reader exits immediately.
+- Go: `AppRunning` gate before `StartApp`, stale-adb recovery
+  (`DevicesFresh`, `RestartServer`, `USBADBInterfacePresent`), power-save
+  warning (`WifiPowerSaveWarning`, `iw ... get power_save`), discover/connect
+  hints, hermetic adb hotplug test (`PATH=""`).
+
+Verified on RMX3710 (user drives the UI; agent only reads
+logcat/dumpsys/daemon API):
+
+- 5 rapid Stop->Start cycles: `ADB server listening`, no
+  `Address already in use`, no FATAL, UI `Ready over Wi-Fi`.
+- ADB streaming: `sawt adb run` -> frames advance.
+- User pressed Stop: `service=0`, no FATAL/NetworkOnMainThread, ADB socket
+  closed and client disconnected within ~1 ms.
+- 45 s stopped while the daemon retried: `MainActivity` 50 -> 50, 0
+  `START u0 ... com.sawtplus.app` events, daemon state `error` (no frames).
+  The ~20 s relaunch loop is fixed.
+- User pressed Start (17:04:45): `service=1`, `ADB server listening`; daemon
+  `adb run` streaming, frames advance.
+- `/api/stream` WebSocket (Cookie auth): 5 frames / 9600 bytes, 4774 of 4800
+  samples nonzero, RMS 63, peak 209. Path works; the room was near-silent.
+- `sawt disconnect` -> `idle adb`; `sawt adb run` -> frames 9857 -> 10009 and
+  the service stayed `1` (reconnect verified).
+- `gofmt` clean; `go build ./...`, `go vet ./...`, `go test ./...` pass;
+  `./gradlew :app:assembleDebug` pass.
+
+Rule: do not run UI interaction tests; the user taps the phone. Verify with
+`adb logcat`, `dumpsys`, and the daemon API only.
+
+Release 2.1.2 (user-requested): `versionCode 6`, `versionName 2.1.2`,
+`internal/version.Version = "2.1.2"`.
+
+- `apk/sawt-plus-2.1.2.apk`: zipaligned release build (non-debuggable),
+  signed with the same debug certificate as 2.1.1 (SHA-256
+  `b3504a96...aa9e78`), so it installs over 2.1.1.
+- `bin/sawt-linux-amd64`: rebuilt with `CGO_ENABLED=0`, `-trimpath`,
+  `-ldflags="-s -w"`; reports `sawt 2.1.2`.
+- `SHA256SUMS` updated; `docs/release-notes/v2.1.2.md` added.
+- `assembleRelease` ran with `-x lintVital*` because the offline cache lacks
+  `lint-gradle:31.7.3`; debug build and Go tests pass.
+
+Next: commit + push `main`, tag `v2.1.2`; the GitHub Actions release workflow
+copies `apk/*.apk` and `bin/sawt-linux-amd64` and creates the release.
+
+## Session 32 (2026-10-24) — diagnosis only, no code changes
+
+User reported three issues after 2.1.1 (USB not listed, Wi-Fi drops/reconnect
+flicker, Stop Service exits the app) and asked for log-based diagnosis first.
+
+Findings:
+
+- USB: the phone *was* enumerated (`lsusb` 22d9:2769, interface 255/66/1 "ADB
+  Interface", `/dev/bus/usb/002/009` rw for the user) but `adb devices` was
+  empty because the adb server had been running since 2026-10-23 and was stale.
+  `adb kill-server` + `adb start-server` immediately listed
+  `WKTK6XLZTCMZAI6P device`, and `sawt discover` then showed the USB row.
+  Not a pairing/TLS problem.
+- After adb was fixed, hotplug auto-connect fired
+  (`15:52:41 USB device ... attached; auto-connecting`) proving the
+  paired-only gate passes. Every ADB stream then failed with
+  `adb stream: EOF` because `RecordService` was not running: `dumpsys activity
+  services` was empty and adbd logged
+  `failed to connect to socket 'localabstract:sawt-plus' (Connection refused)`.
+  Daemon `am start` only opens MainActivity and does not clear `userStopped`.
+- Pairing: PC unpair at 15:35:30, re-pair 15:37:25 -> `paired with Sawt+`.
+  Phone `shared_prefs/sawtplus.xml` has exactly one `paired_tokens` hash and it
+  equals SHA-256 of the PC token (dc317afd...c66a) -> both sides are paired
+  now. The suspected "unpair wiped USB pairing" chain is disproven for the
+  current state (it could only have applied in the 15:35:30-15:37:25 window).
+  The exact phone-side "Unpair all" log is gone (main logcat buffer rotates
+  fast; oldest entry 15:55, only 7 `Sawt` lines left).
+- Stop Service crash (confirmed 3x): `FATAL EXCEPTION: main`,
+  `Unable to stop service ...RecordService: NetworkOnMainThreadException`,
+  stack `RecordService.onDestroy -> stopWifi -> WifiServer.stopServer ->
+  TlsFrontend.stop -> closeQuietly(TlsFrontend.java:279) ->
+  ConscryptEngineSocket.close` -> SSL close does network I/O on the main thread.
+  `am_crash`/`am_proc_died` at 15:34:22, 15:39:16, 15:39:29.
+- Wi-Fi daemon log (window 14:09-15:57): 5x `i/o timeout`, 5x `connection
+  reset by peer`, 4x EOF/1006, several `connection refused`, 5x
+  `unexpected handshake message "stats"`, 1x IPv6 link-local rediscover
+  `connect: invalid argument`. Resets at 15:34:27 and 15:39:19/30 line up
+  exactly with the Stop-Service crashes. The `stats` failure is a real phone
+  bug: `WifiServer.authenticate` does `clients.put` before `sendReady`
+  (WifiServer.java:406-408) while `sendStats` runs every 2 s
+  (WifiServer.java:165) -> stats can precede `ready` and the daemon aborts.
+- The "~2 s reconnect" appearance is the web UI poll
+  (`internal/web/dist/index.html:1934` `setInterval(poll, 2000)`); the daemon
+  backoff is 1/2/4/8/16 s.
+- Battery: `dumpsys deviceidle whitelist` contains
+  `user,com.sawtplus.app,10374` = Unrestricted. PC Wi-Fi
+  `iw dev wlp0s29u1u3 get power_save` = on (NM profile value 0/default);
+  link 2462 MHz, -56 dBm, 19.5/65 Mbit; phone RSSI -66, 58 Mbps,
+  `wifi_power_save=120`. Both ends use Wi-Fi power save.
+- Close origin in the daemon log: `reset by peer` = phone/intermediary closed;
+  `i/o timeout` = daemon timed out waiting for frames (phone silent/link
+  stall); `connection refused` = phone TLS server not listening (service
+  stopped/crashed); `stats` = daemon itself aborted the handshake.
+
+No code or config changed. `adb` was restarted (host-side only) and the daemon
+auto-connect left armed. Next (await user agreement): fix Stop-Service crash
+(off-main-thread TLS close), the stats/ready ordering race, then decide on
+power-save mitigation and the stale-adb UX.
+
 
 - Problem: 2.1.0 could not pair over Wi-Fi. TCP 8765 was open and mDNS was
   advertised, but every TLS handshake failed (OpenSSL `decode_error`/EOF,

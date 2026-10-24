@@ -4,6 +4,7 @@ import android.content.Context;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
 import android.net.wifi.WifiManager;
+import android.os.Looper;
 import android.util.Log;
 
 import org.java_websocket.WebSocket;
@@ -227,6 +228,21 @@ final class WifiServer extends WebSocketServer {
         if (!shuttingDown.compareAndSet(false, true)) {
             return;
         }
+        // Closing TLS/WebSocket sockets performs network I/O (TLS close_notify
+        // writes). Android throws NetworkOnMainThreadException for that, and a
+        // slow close can also ANR. RecordService already calls teardown on a
+        // worker; this guard keeps the invariant even if a future caller
+        // forgets.
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            Thread worker = new Thread(this::stopServerBlocking, "sawt-wifi-stop");
+            worker.setDaemon(true);
+            worker.start();
+            return;
+        }
+        stopServerBlocking();
+    }
+
+    private void stopServerBlocking() {
         if (scheduler != null) {
             scheduler.shutdownNow();
             scheduler = null;
@@ -403,9 +419,13 @@ final class WifiServer extends WebSocketServer {
             session.authenticated = true;
         }
         WifiClient client = new WifiClient(conn);
+        // "ready" must be the first control message this client receives.
+        // sendStats runs every 2 s over the clients map, so adding the client
+        // before-ready lets stats (and audio) win the race and the PC aborts
+        // the handshake with "unexpected handshake message stats".
+        sendReady(conn, clients.size() + 1);
         clients.put(conn, client);
         hub.addSink(client);
-        sendReady(conn);
         ServiceState.clients = clients.size();
         ServiceState.transport = "Wi-Fi";
         ServiceState.error = "";
@@ -441,7 +461,7 @@ final class WifiServer extends WebSocketServer {
         Log.i(TAG, "dropped all Wi-Fi clients after token revocation");
     }
 
-    private void sendReady(WebSocket conn) {
+    private void sendReady(WebSocket conn, int clientCount) {
         JSONObject obj = new JSONObject();
         try {
             obj.put("type", "ready");
@@ -452,7 +472,7 @@ final class WifiServer extends WebSocketServer {
             obj.put("channels", App.CHANNELS);
             obj.put("format", "s16le");
             obj.put("frame_ms", App.FRAME_MS);
-            obj.put("clients", clients.size());
+            obj.put("clients", clientCount);
             obj.put("cert_sha256", certFingerprint);
         } catch (JSONException ignored) {
         }

@@ -87,6 +87,9 @@ func TestPairedADBTarget(t *testing.T) {
 // TestADBHotplugSerialsNoADB verifies the watcher degrades to "nothing
 // attached" where adb is not installed (this test environment).
 func TestADBHotplugSerialsNoADB(t *testing.T) {
+	// Force the "adb not installed" environment even when the machine running
+	// the tests has android-tools and a real phone attached.
+	t.Setenv("PATH", "")
 	d := newTestDaemon(t)
 	if got := d.adbHotplugSerials(t.Context()); len(got) != 0 {
 		t.Fatalf("adbHotplugSerials without adb = %v, want empty", got)
