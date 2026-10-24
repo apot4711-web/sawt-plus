@@ -45,9 +45,19 @@
 - Re-verified after the hardening rebuild: TLS handshake works, internal port
   is the real bound port (`46877`), and the daemon reconnects after
   force-stop/relaunch (error → streaming in ~6 s, ~50 frames/s).
-- Next: commit, tag `v2.1.1`, push, and let the release workflow publish
-  (user said "كمل"). Then verify the release assets/hashes.
-- Blocked: none functionally; audio-quality/jitter investigation is separate.
+- Done: release commit `265768b`, annotated tag `v2.1.1`, workflow run
+  <https://github.com/apot4711-web/sawt-plus/actions/runs/40092845298>
+  succeeded. Release published at
+  <https://github.com/apot4711-web/sawt-plus/releases/tag/v2.1.1> with
+  `sawt-plus.apk` (6,037,412), `sawt-linux-amd64` (9,080,994),
+  `sawt-plus-source.zip` (513,409) and `SHA256SUMS`; downloaded APK/bin hashes
+  match the local sums. Bilingual notes came from
+  `docs/release-notes/v2.1.1.md`.
+- `main` was behind a remote README-only commit (`dc1b0e7`); merged it as
+  `f96d67d` and pushed. Tag `v2.1.1` remains on the release commit.
+- Next: users must unpair both sides once and re-pair (new certificate).
+  Audio jitter on this test link is a separate follow-up (PC Wi-Fi power save).
+- Blocked: none.
 
 ## Session 30 (2026-10-24) — release Sawt+ 2.1.0 (security release)
 
