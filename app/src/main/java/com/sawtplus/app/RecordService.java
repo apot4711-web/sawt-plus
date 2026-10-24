@@ -154,8 +154,11 @@ public class RecordService extends Service {
         }
         try {
             wifiServer = new WifiServer(this, hub, tokens, App.PORT);
-            wifiServer.startServer();
-            ServiceState.error = "";
+            if (wifiServer.startServer()) {
+                ServiceState.error = "";
+            } else {
+                wifiServer = null;
+            }
         } catch (IOException e) {
             Log.e(TAG, "start Wi-Fi", e);
             ServiceState.error = "Wi-Fi server: " + e.getMessage();

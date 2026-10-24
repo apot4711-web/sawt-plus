@@ -33,10 +33,18 @@ import javax.security.auth.x500.X500Principal;
  * fingerprint (TOFU) — see WifiServer's class Javadoc for the wire contract.
  * A 25-year validity is used because expiry is handled by re-pinning, not by
  * CA validation.
+ *
+ * <p>API 23+ keys authorize {@code DIGEST_NONE}: the TLS stack (Conscrypt)
+ * hashes the handshake itself and asks the keystore to sign the pre-hashed
+ * value, so a key restricted to SHA-256 cannot be used for server
+ * authentication. The alias was bumped when this changed; the previous key
+ * (aliased {@code sawtplus_tls}) is deleted so the fingerprint changes
+ * deterministically.
  */
 final class TlsCertificate {
     private static final String TAG = App.TAG;
-    private static final String ALIAS = "sawtplus_tls";
+    private static final String ALIAS = "sawtplus_tls_v2";
+    private static final String LEGACY_ALIAS = "sawtplus_tls";
     private static final String KEYSTORE_PROVIDER = "AndroidKeyStore";
     /** Regenerate the certificate when it expires within this window. */
     private static final long REFRESH_BEFORE_MS = 30L * 24 * 3600 * 1000;
@@ -55,6 +63,7 @@ final class TlsCertificate {
         if (cachedFingerprint != null) {
             return cachedFingerprint;
         }
+        deleteLegacyKey();
         X509Certificate cert = loadValid();
         if (cert == null) {
             generate(context.getApplicationContext(), deviceId);
@@ -71,7 +80,7 @@ final class TlsCertificate {
     /**
      * TLS server context whose KeyManager serves the self-signed certificate.
      * The caller is responsible for restricting protocols/ciphers (see
-     * TlsServerFactory, which enforces TLS 1.2+).
+     * TlsFrontend, which enforces TLS 1.2+).
      */
     static synchronized SSLContext serverContext(Context context, String deviceId) throws Exception {
         fingerprint(context, deviceId); // ensure key + certificate exist
@@ -83,6 +92,15 @@ final class TlsCertificate {
         SSLContext ssl = SSLContext.getInstance("TLS");
         ssl.init(kmf.getKeyManagers(), null, new SecureRandom());
         return ssl;
+    }
+
+    private static void deleteLegacyKey() throws Exception {
+        KeyStore ks = KeyStore.getInstance(KEYSTORE_PROVIDER);
+        ks.load(null);
+        if (ks.containsAlias(LEGACY_ALIAS)) {
+            ks.deleteEntry(LEGACY_ALIAS);
+            Log.i(TAG, "deleted legacy TLS key " + LEGACY_ALIAS);
+        }
     }
 
     private static X509Certificate loadValid() throws Exception {
@@ -113,6 +131,7 @@ final class TlsCertificate {
 
     private static void generateEc(Context appContext, String deviceId) throws Exception {
         Calendar notBefore = Calendar.getInstance();
+        notBefore.add(Calendar.DAY_OF_MONTH, -1);
         Calendar notAfter = Calendar.getInstance();
         notAfter.add(Calendar.YEAR, VALIDITY_YEARS);
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC", KEYSTORE_PROVIDER);
@@ -123,7 +142,9 @@ final class TlsCertificate {
                         android.security.keystore.KeyProperties.PURPOSE_SIGN
                                 | android.security.keystore.KeyProperties.PURPOSE_VERIFY)
                 .setAlgorithmParameterSpec(new java.security.spec.ECGenParameterSpec("secp256r1"))
-                .setDigests(android.security.keystore.KeyProperties.DIGEST_SHA256)
+                // TLS signs a digest produced by Conscrypt, so the key must
+                // allow raw (DIGEST_NONE) signing.
+                .setDigests(android.security.keystore.KeyProperties.DIGEST_NONE)
                 .setCertificateSubject(new X500Principal("CN=SawtPlus " + shortId(deviceId)))
                 .setCertificateSerialNumber(new BigInteger(64, new SecureRandom()))
                 .setCertificateNotBefore(notBefore.getTime())
@@ -134,6 +155,7 @@ final class TlsCertificate {
 
     private static void generateRsa(Context appContext, String deviceId) throws Exception {
         Calendar notBefore = Calendar.getInstance();
+        notBefore.add(Calendar.DAY_OF_MONTH, -1);
         Calendar notAfter = Calendar.getInstance();
         notAfter.add(Calendar.YEAR, VALIDITY_YEARS);
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA", KEYSTORE_PROVIDER);

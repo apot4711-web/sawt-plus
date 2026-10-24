@@ -7,7 +7,10 @@ import android.net.wifi.WifiManager;
 import android.util.Log;
 
 import org.java_websocket.WebSocket;
+import org.java_websocket.drafts.Draft;
+import org.java_websocket.exceptions.InvalidDataException;
 import org.java_websocket.handshake.ClientHandshake;
+import org.java_websocket.handshake.ServerHandshakeBuilder;
 import org.java_websocket.server.WebSocketServer;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -17,7 +20,6 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
-import java.net.ServerSocket;
 import java.net.SocketException;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -43,7 +45,9 @@ import javax.net.ssl.SSLContext;
  * <p><b>Wire contract for the PC client (TLS):</b>
  * <ul>
  *   <li>Transport is <b>wss://HOST:PORT only</b> — the server speaks no
- *       cleartext ws://. TLS 1.2+ is enforced (see TlsServerFactory).</li>
+ *       cleartext ws://. TLS 1.2+ is enforced by the synchronous
+ *       {@link TlsFrontend}; the WebSocket server itself listens on loopback
+ *       and is reachable only through that front end.</li>
  *   <li>Server certificate: self-signed X.509, EC P-256 on API 23+,
  *       RSA-2048 on API 21-22 (AndroidKeyStore has no EC before API 23),
  *       CN "SawtPlus &lt;device-id&gt;" (no '+': it is special in RFC 2253
@@ -81,11 +85,15 @@ final class WifiServer extends WebSocketServer {
     private final Context context;
     private final StreamHub hub;
     private final TokenStore tokens;
-    private final int port;
+    private final int preferredPort;
     private final String deviceId;
     private final String deviceName;
     private final String certFingerprint;
+    private final SSLContext sslContext;
+    private final String internalSecret;
     private final SecureRandom random = new SecureRandom();
+    private volatile int publicPort;
+    private TlsFrontend frontend;
 
     private final Map<WebSocket, Session> sessions = new ConcurrentHashMap<>();
     private final Map<WebSocket, WifiClient> clients = new ConcurrentHashMap<>();
@@ -103,20 +111,24 @@ final class WifiServer extends WebSocketServer {
     private volatile long pairingExpiresAt;
 
     WifiServer(Context context, StreamHub hub, TokenStore tokens, int preferredPort) throws IOException {
-        super(pickAddress(preferredPort));
+        // The WebSocket server itself is cleartext and bound to loopback; the
+        // public TLS listener (TlsFrontend) forwards decrypted bytes to it.
+        // Binding on port 0 lets the kernel pick the port atomically; the
+        // actual port is read after startServer() sees the server is bound.
+        super(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
         this.context = context.getApplicationContext();
         this.hub = hub;
         this.tokens = tokens;
-        this.port = getAddress().getPort();
+        this.preferredPort = preferredPort;
         this.deviceId = tokens.deviceId();
         this.deviceName = sanitizeDeviceName(tokens.deviceName());
+        this.internalSecret = newInternalSecret();
         // TLS-only transport. Fail closed: if the certificate or SSLContext
         // cannot be created, the constructor throws and the server never
         // starts in cleartext.
         try {
-            SSLContext tls = TlsCertificate.serverContext(this.context, this.deviceId);
-            setWebSocketFactory(new TlsServerFactory(tls));
-            certFingerprint = TlsCertificate.fingerprint(this.context, this.deviceId);
+            this.sslContext = TlsCertificate.serverContext(this.context, this.deviceId);
+            this.certFingerprint = TlsCertificate.fingerprint(this.context, this.deviceId);
         } catch (Exception e) {
             throw new IOException("TLS setup failed", e);
         }
@@ -129,7 +141,8 @@ final class WifiServer extends WebSocketServer {
     }
 
     int port() {
-        return port;
+        int port = publicPort;
+        return port != 0 ? port : preferredPort;
     }
 
     /**
@@ -140,7 +153,7 @@ final class WifiServer extends WebSocketServer {
         return certFingerprint;
     }
 
-    void startServer() {
+    boolean startServer() {
         acquireLocks();
         refreshPairingCode();
         scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -152,14 +165,62 @@ final class WifiServer extends WebSocketServer {
         scheduler.scheduleAtFixedRate(this::sendStats, 2, 2, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(this::closeStaleSessions, 5, 5, TimeUnit.SECONDS);
 
-        start();
+        start(); // bind the internal loopback WebSocket server first
+        int internalPort = awaitInternalPort();
+        if (internalPort == 0) {
+            Log.e(TAG, "Wi-Fi server failed to bind on loopback");
+            ServiceState.error = "Wi-Fi server failed to start";
+            abortStart();
+            return false;
+        }
+        try {
+            frontend = new TlsFrontend(sslContext, preferredPort, internalPort, internalSecret);
+            publicPort = frontend.start();
+        } catch (IOException e) {
+            Log.e(TAG, "TLS server failed to start", e);
+            ServiceState.error = "TLS server failed: " + e.getMessage();
+            frontend = null;
+            abortStart();
+            return false;
+        }
         registerMdns();
 
         ServiceState.wifiEnabled = true;
         ServiceState.address = findLocalAddress();
-        ServiceState.port = port;
+        ServiceState.port = publicPort;
         ServiceState.transport = "Wi-Fi";
-        Log.i(TAG, "Wi-Fi server listening on " + ServiceState.address + ":" + port);
+        Log.i(TAG, "Wi-Fi server listening on " + ServiceState.address + ":" + publicPort);
+        return true;
+    }
+
+    private int awaitInternalPort() {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        while (!shuttingDown.get() && System.nanoTime() < deadline) {
+            int port = getPort();
+            if (port != 0) {
+                return port;
+            }
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return 0;
+            }
+        }
+        return getPort();
+    }
+
+    private void abortStart() {
+        if (scheduler != null) {
+            scheduler.shutdownNow();
+            scheduler = null;
+        }
+        releaseLocks();
+        try {
+            stop(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     void stopServer() {
@@ -169,6 +230,11 @@ final class WifiServer extends WebSocketServer {
         if (scheduler != null) {
             scheduler.shutdownNow();
             scheduler = null;
+        }
+        TlsFrontend tlsFrontend = frontend;
+        frontend = null;
+        if (tlsFrontend != null) {
+            tlsFrontend.stop();
         }
         unregisterMdns();
         releaseLocks();
@@ -193,7 +259,23 @@ final class WifiServer extends WebSocketServer {
     // ------------------------------------------------------------------
 
     @Override
+    public ServerHandshakeBuilder onWebsocketHandshakeReceivedAsServer(
+            WebSocket conn, Draft draft, ClientHandshake request) throws InvalidDataException {
+        // The internal WebSocket server is loopback-only; a per-process secret
+        // injected by TlsFrontend keeps other apps on the phone out.
+        String secret = request.getFieldValue("x-sawt-internal");
+        if (secret == null || !MessageDigest.isEqual(
+                secret.getBytes(StandardCharsets.US_ASCII),
+                internalSecret.getBytes(StandardCharsets.US_ASCII))) {
+            Log.w(TAG, "rejected direct connection to the internal WebSocket server");
+            throw new InvalidDataException(1008, "forbidden");
+        }
+        return super.onWebsocketHandshakeReceivedAsServer(conn, draft, request);
+    }
+
+    @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
+        String forwardedIp = sanitizeIp(handshake.getFieldValue("x-forwarded-for"));
         synchronized (sessions) {
             int pending = 0;
             for (Session session : sessions.values()) {
@@ -206,9 +288,10 @@ final class WifiServer extends WebSocketServer {
                 conn.close(1013, "too many pending connections");
                 return;
             }
-            sessions.put(conn, new Session(System.currentTimeMillis()));
+            sessions.put(conn, new Session(System.currentTimeMillis(), forwardedIp));
         }
-        Log.i(TAG, "Wi-Fi client connected: " + conn.getRemoteSocketAddress());
+        Log.i(TAG, "Wi-Fi client connected: " + conn.getRemoteSocketAddress()
+                + (forwardedIp == null ? "" : " (from " + forwardedIp + ")"));
     }
 
     @Override
@@ -239,7 +322,7 @@ final class WifiServer extends WebSocketServer {
                         sendError(conn, "already paired");
                         break;
                     }
-                    String ip = remoteIp(conn);
+                    String ip = remoteIp(conn, session);
                     long cooldown = pairCooldownSeconds(ip);
                     if (cooldown > 0) {
                         sendError(conn, "too many attempts; try again in " + cooldown + "s", cooldown);
@@ -300,7 +383,7 @@ final class WifiServer extends WebSocketServer {
     @Override
     public void onStart() {
         setConnectionLostTimeout(30);
-        Log.i(TAG, "Wi-Fi wss server started on port " + port);
+        Log.i(TAG, "internal WebSocket server listening on loopback port " + getPort());
     }
 
     // ------------------------------------------------------------------
@@ -546,12 +629,41 @@ final class WifiServer extends WebSocketServer {
         return Math.min(MAX_PAIR_DELAY_SECONDS, 1L << shift);
     }
 
-    private static String remoteIp(WebSocket conn) {
+    private static String remoteIp(WebSocket conn, Session session) {
+        if (session != null && session.remoteIp != null) {
+            return session.remoteIp;
+        }
         InetSocketAddress address = conn.getRemoteSocketAddress();
         if (address == null || address.getAddress() == null) {
             return "unknown";
         }
         return address.getAddress().getHostAddress();
+    }
+
+    /** Accepts only an IP literal injected by TlsFrontend; never resolves DNS. */
+    private static String sanitizeIp(String value) {
+        if (value == null) {
+            return null;
+        }
+        String ip = value.trim();
+        int zone = ip.indexOf('%');
+        if (zone >= 0) {
+            ip = ip.substring(0, zone);
+        }
+        if (ip.isEmpty() || ip.length() > 45 || !ip.matches("[0-9a-fA-F:.]+")) {
+            return null;
+        }
+        return ip;
+    }
+
+    private static String newInternalSecret() {
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        StringBuilder sb = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) {
+            sb.append(String.format(Locale.US, "%02x", b));
+        }
+        return sb.toString();
     }
 
     private void closeStaleSessions() {
@@ -580,7 +692,7 @@ final class WifiServer extends WebSocketServer {
         NsdServiceInfo info = new NsdServiceInfo();
         info.setServiceName("Sawt-" + deviceId.substring(0, Math.min(6, deviceId.length())));
         info.setServiceType(SERVICE_TYPE);
-        info.setPort(port);
+        info.setPort(port());
         try {
             info.setAttribute("id", deviceId);
             info.setAttribute("name", deviceName);
@@ -704,30 +816,18 @@ final class WifiServer extends WebSocketServer {
         return out.isEmpty() ? "Sawt+" : out;
     }
 
-    private static InetSocketAddress pickAddress(int preferredPort) throws IOException {
-        IOException last = null;
-        for (int port = preferredPort; port < preferredPort + 10; port++) {
-            try (ServerSocket socket = new ServerSocket()) {
-                socket.setReuseAddress(true);
-                socket.bind(new InetSocketAddress(port));
-                return new InetSocketAddress(port);
-            } catch (IOException e) {
-                last = e;
-            }
-        }
-        throw last != null ? last : new IOException("no free port in range");
-    }
-
     // ------------------------------------------------------------------
     // Client sink
     // ------------------------------------------------------------------
 
     private static final class Session {
         final long openedAt;
+        final String remoteIp;
         volatile boolean authenticated;
 
-        Session(long openedAt) {
+        Session(long openedAt, String remoteIp) {
             this.openedAt = openedAt;
+            this.remoteIp = remoteIp;
         }
     }
 

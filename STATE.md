@@ -1,5 +1,54 @@
 # Project State
 
+## Session 31 (2026-10-24) — fix 2.1.0 Wi-Fi pairing, verify 2.1.1 on device
+
+- Problem: 2.1.0 could not pair over Wi-Fi. TCP 8765 was open and mDNS was
+  advertised, but every TLS handshake failed (OpenSSL `decode_error`/EOF,
+  Java `Remote host terminated the handshake`, Go `EOF`). Console could not
+  use its `DIGEST_SHA256`-only keystore key for TLS server auth; Java-WebSocket
+  `SSLSocketChannel2` was also unsafe server-side.
+- Fix (user-approved): deleted `TlsServerFactory.java`; added `TlsFrontend`
+  (blocking `SSLServerSocket`, TLS 1.2/1.3, explicit handshake timeout, HTTP
+  upgrade head parsing, injects `X-Sawt-Internal` secret + `X-Forwarded-For`,
+  byte-bridges to an internal loopback WebSocket server). `WifiServer` binds
+  the WebSocket server on loopback port 0 (atomic kernel choice), waits up to
+  3 s for the actual bound port before starting `TlsFrontend`, so mDNS/TLS are
+  never advertised if the internal bind fails; it rejects missing/wrong
+  secret and uses the forwarded client IP. `TlsCertificate` uses alias
+  `sawtplus_tls_v2`, deletes legacy alias, EC key with `DIGEST_NONE`, cert
+  notBefore -1 day.
+- Version bumped to `versionCode 5` / `versionName 2.1.1` and
+  `internal/version.Version = "2.1.1"`; Go binary rebuilt (`sawt 2.1.1`).
+- Verified on RMX3710 over USB ADB: APK installs; `openssl s_client` now gets
+  `CN=SawtPlus 89160db0`, `ECDHE-ECDSA-AES128-GCM-SHA256`; fresh pair after
+  `pm clear` succeeds (`234225`), streaming at ~50 frames/s; manual
+  disconnect/connect and reconnect after force-stop/relaunch both return to
+  streaming in ~4-6 s. Client IP is forwarded correctly
+  (`Wi-Fi client connected ... (from 192.168.161.8)`).
+- Audio caveat: capture works (RMS ≈ 400-700, real PCM in `/api/stream`), but
+  this test link is poor: PC Wi-Fi `Power save: on`, RTT spikes 200-800 ms,
+  25-100% ping loss, occasional 2-4 s stalls and pong timeouts. Zero-filled
+  gaps in `parecord` come from PipeWire underruns caused by those stalls, not
+  from the app. Toggling phone Wi-Fi recovered streaming. Separate follow-up.
+- Reviewer pass found a loopback port race (pre-picked port freed before
+  bind), a socket-set leak, a header slowloris window, and a null race in
+  `TlsFrontend.stop()`; all fixed before packaging. `startServer()` now
+  returns success/failure and `RecordService` keeps the error and allows a
+  retry instead of clearing it.
+- Artifacts refreshed: `apk/sawt-plus-2.1.1.apk` (6,037,412 bytes,
+  sha256 `151a25bf...a55091a7e1`; `versionCode 5`, `versionName 2.1.1`),
+  `bin/sawt-linux-amd64` (9,080,994, sha256 `0e4bd54e...d3de5bb1`),
+  `docs/release-notes/v2.1.1.md`, `SHA256SUMS`.
+- Tests: `go build ./...` and `go vet ./...` pass. `go test ./...` has one
+  environmental failure: `TestADBHotplugSerialsNoADB` expects no adb/device,
+  but a real device is now attached; the other daemon tests pass.
+- Re-verified after the hardening rebuild: TLS handshake works, internal port
+  is the real bound port (`46877`), and the daemon reconnects after
+  force-stop/relaunch (error → streaming in ~6 s, ~50 frames/s).
+- Next: commit, tag `v2.1.1`, push, and let the release workflow publish
+  (user said "كمل"). Then verify the release assets/hashes.
+- Blocked: none functionally; audio-quality/jitter investigation is separate.
+
 ## Session 30 (2026-10-24) — release Sawt+ 2.1.0 (security release)
 
 - User asked to publish the rebuilt app to GitHub Releases.
