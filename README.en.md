@@ -1,7 +1,7 @@
 <a id="top"></a>
 
 <div align="center">
-  <img src="assets/banner-en.svg" alt="Sawt+ — wireless microphone for Linux" width="100%">
+  <img src="assets/banner-en.svg" alt="Sawt+ — microphone for Linux" width="100%">
   <h3>Your phone, as your computer's microphone.</h3>
   <p>
     Sawt+ turns an Android phone into a wireless microphone for a Linux computer
@@ -44,29 +44,37 @@
 | --- | --- |
 | Computer | Linux with PipeWire or PulseAudio (most modern distributions) |
 | Phone | Android 5.0 or newer |
-| Network | Both devices on the same Wi-Fi network |
+| Network | Both devices on the same Wi-Fi network (for wireless; USB needs Wi-Fi only for the first pairing) |
 
 **Steps**
 
 1. Download and install the [Android app](https://github.com/apot4711-web/sawt-plus/releases/latest/download/sawt-plus.apk). If a security warning appears during installation, choose **Install anyway** or **Allow**.
 
-2. Download the [computer program](https://github.com/apot4711-web/sawt-plus/releases/latest/download/sawt-linux-amd64), save it, then make it executable and start it:
+2. Download the [computer program](https://github.com/apot4711-web/sawt-plus/releases/latest/download/sawt-linux-amd64), save it, then open the terminal (the command window), make it executable and start it:
 
    ```bash
    chmod +x ~/Downloads/sawt-linux-amd64
    ~/Downloads/sawt-linux-amd64 web
    ```
 
-   If you saved the file somewhere else, change the path to match. The
+   The first command is a one-time permission; the second starts Sawt+ and opens the web page. If you saved the file somewhere else, change the path to match. The
    [advanced guide](docs/advanced.md#linux-computer) has more details.
 
-3. Open the app on the phone and tap **Start service**, then start the Sawt+ program on the computer and enter the 6-digit code shown in the app.
+3. Open the app on the phone, tap **Start service**, and note the 6-digit code.
 
-4. Choose **Sawt+** (`sawt-plus`) as the microphone in your audio settings or meeting app.
+4. In the web page the program opened (`http://127.0.0.1:8787`), pick the phone from the list, enter the code, then start streaming. (Terminal alternative: the `pair` command — see the advanced guide.)
+
+5. Choose **Sawt+** (`sawt-plus`) as the microphone in your audio settings or meeting app.
 
 > [!TIP]
 > After the first pairing, connections happen automatically. The single
 > executable is all you need; no extra packages are required on the computer.
+
+> [!NOTE]
+> **About USB:** the cable needs no shared Wi-Fi network, but the first pairing must happen over Wi-Fi: pair once as described above, and afterwards auto-connect works when you plug the cable in.
+
+> [!IMPORTANT]
+> **If you are updating from 2.0.2 or older:** update the phone app and the computer program together — old and new versions cannot talk to each other. If pairing is rejected after the update, tap **New code** in the app and pair again, and open **Settings → Certificate fingerprint** on the phone on the first connection so the computer pins the new certificate.
 
 <!-- IMAGE SLOT: hero
      When a Sawt+ interface screenshot is available, replace this comment with:
