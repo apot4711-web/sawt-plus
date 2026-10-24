@@ -15,6 +15,7 @@ public final class ServiceState {
     public static volatile String error = "";
     public static volatile String deviceName = "";
     public static volatile String deviceId = "";
+    public static volatile String certFingerprint = "";
     public static volatile String source = "";
     public static volatile long frames;
     public static volatile long dropped;
@@ -38,6 +39,7 @@ public final class ServiceState {
         source = "";
         frames = 0;
         dropped = 0;
+        certFingerprint = "";
         transport = "idle";
         muted = false;
         gain = 1f;

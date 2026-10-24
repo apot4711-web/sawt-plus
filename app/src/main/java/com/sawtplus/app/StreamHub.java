@@ -23,12 +23,19 @@ final class StreamHub {
 
     private static final String TAG = App.TAG;
     private static final long STOP_GRACE_MS = 1500;
+    private static final int MAX_RESTART_ATTEMPTS = 6;
+    private static final long RESTART_BASE_DELAY_MS = 2000;
+    private static final long RESTART_MAX_DELAY_MS = 30000;
+    private static final String ERROR_RETRYING = "Microphone interrupted - retrying";
 
     private final CopyOnWriteArrayList<Sink> sinks = new CopyOnWriteArrayList<>();
     private final AudioCapture capture;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable stopCapture = this::maybeStopCapture;
+    private final Runnable restartCapture = this::tryRestartCapture;
     private boolean stopScheduled;
+    private boolean restartScheduled;
+    private int restartAttempts;
     private volatile boolean closed;
     private byte[] silence;
 
@@ -44,6 +51,13 @@ final class StreamHub {
                     public void onError(String message) {
                         Log.e(TAG, message);
                         ServiceState.error = message;
+                    }
+
+                    @Override
+                    public void onCaptureInterrupted() {
+                        Log.w(TAG, "microphone capture interrupted");
+                        ServiceState.error = ERROR_RETRYING;
+                        scheduleRestart();
                     }
                 });
     }
@@ -70,6 +84,7 @@ final class StreamHub {
         ServiceState.clients = sinks.size();
         if (sinks.isEmpty()) {
             synchronized (this) {
+                cancelRestartLocked();
                 if (!stopScheduled) {
                     stopScheduled = true;
                     handler.postDelayed(stopCapture, STOP_GRACE_MS);
@@ -78,11 +93,75 @@ final class StreamHub {
         }
     }
 
+    /**
+     * Must be called with the StreamHub monitor held.
+     */
+    private void cancelRestartLocked() {
+        restartScheduled = false;
+        handler.removeCallbacks(restartCapture);
+    }
+
+    /**
+     * Schedules a microphone re-acquire after an interruption, with
+     * exponential backoff. Only fires while clients are still connected;
+     * gives up after MAX_RESTART_ATTEMPTS.
+     */
+    private void scheduleRestart() {
+        boolean schedule;
+        long delay = 0;
+        synchronized (this) {
+            schedule = !closed && !restartScheduled && !sinks.isEmpty()
+                    && restartAttempts < MAX_RESTART_ATTEMPTS;
+            if (schedule) {
+                restartScheduled = true;
+                delay = Math.min(RESTART_BASE_DELAY_MS * (1L << restartAttempts),
+                        RESTART_MAX_DELAY_MS);
+                restartAttempts++;
+            } else if (!closed && !sinks.isEmpty()
+                    && restartAttempts >= MAX_RESTART_ATTEMPTS) {
+                Log.w(TAG, "microphone restart attempts exhausted");
+                ServiceState.error = "Microphone unavailable";
+            }
+        }
+        if (schedule) {
+            handler.postDelayed(restartCapture, delay);
+        }
+    }
+
+    private void tryRestartCapture() {
+        boolean shouldStart;
+        synchronized (this) {
+            restartScheduled = false;
+            shouldStart = !closed && !sinks.isEmpty() && !capture.isRunning();
+        }
+        if (!shouldStart) {
+            return;
+        }
+        Log.i(TAG, "retrying microphone capture");
+        capture.start();
+        boolean runningNow = capture.isRunning();
+        synchronized (this) {
+            if (runningNow) {
+                restartAttempts = 0;
+                if (ERROR_RETRYING.equals(ServiceState.error)) {
+                    ServiceState.error = "";
+                }
+            }
+        }
+        if (!runningNow) {
+            // Still unavailable (mic held by another app?) — try again later.
+            scheduleRestart();
+        }
+    }
+
     private void startCapture() {
         if (closed) {
             return;
         }
         if (!capture.isRunning()) {
+            synchronized (this) {
+                restartAttempts = 0;
+            }
             capture.start();
             Log.i(TAG, "microphone capture started");
         }
@@ -134,6 +213,9 @@ final class StreamHub {
     void shutdown() {
         closed = true;
         handler.removeCallbacks(stopCapture);
+        synchronized (this) {
+            cancelRestartLocked();
+        }
         for (Sink sink : sinks) {
             sink.close();
         }

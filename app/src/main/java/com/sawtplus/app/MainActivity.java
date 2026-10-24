@@ -333,9 +333,14 @@ public class MainActivity extends AppCompatActivity {
         TextView languageValue = content.findViewById(R.id.languageValueView);
         TextView themeValue = content.findViewById(R.id.themeValueView);
         TextView deviceNameValue = content.findViewById(R.id.deviceNameValueView);
+        TextView pairedDevicesValue = content.findViewById(R.id.pairedDevicesValueView);
+        TextView certFingerprintValue = content.findViewById(R.id.certFingerprintValueView);
         languageValue.setText(languageLabel(tokens.language()));
         themeValue.setText(themeLabel(tokens.theme()));
         deviceNameValue.setText(tokens.deviceName());
+        pairedDevicesValue.setText(String.valueOf(tokens.tokens().size()));
+        String fingerprint = ServiceState.certFingerprint;
+        certFingerprintValue.setText(fingerprint.isEmpty() ? "—" : shortFingerprint(fingerprint));
 
         BottomSheetDialog dialog = new BottomSheetDialog(this);
         dialog.setContentView(content);
@@ -350,6 +355,14 @@ public class MainActivity extends AppCompatActivity {
         content.findViewById(R.id.rowDeviceName).setOnClickListener(v -> {
             dialog.dismiss();
             showDeviceNameDialog();
+        });
+        content.findViewById(R.id.rowPairedDevices).setOnClickListener(v -> {
+            dialog.dismiss();
+            showUnpairDialog();
+        });
+        content.findViewById(R.id.rowCertFingerprint).setOnClickListener(v -> {
+            dialog.dismiss();
+            showCertFingerprintDialog();
         });
         content.findViewById(R.id.rowBattery).setOnClickListener(v -> {
             dialog.dismiss();
@@ -441,6 +454,64 @@ public class MainActivity extends AppCompatActivity {
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private void showUnpairDialog() {
+        int count = tokens.tokens().size();
+        if (count == 0) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.settings_paired_devices)
+                    .setMessage(R.string.unpair_none)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show();
+            return;
+        }
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.unpair_all_title)
+                .setMessage(getResources().getQuantityString(R.plurals.unpair_all_message, count, count))
+                .setPositiveButton(R.string.unpair_all, (d, which) -> {
+                    // Revoke here so it also works when the service is
+                    // stopped (then there are no live sessions to drop).
+                    tokens.removeAll();
+                    if (ServiceState.running) {
+                        RecordService.unpairAll(this);
+                    }
+                    Snackbar.make(findViewById(R.id.root), R.string.unpair_all_done, Snackbar.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showCertFingerprintDialog() {
+        String fingerprint = ServiceState.certFingerprint;
+        if (fingerprint.isEmpty()) {
+            return;
+        }
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.cert_fingerprint_title)
+                .setMessage(getString(R.string.cert_fingerprint_message, formatFingerprint(fingerprint)))
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
+    }
+
+    /** Short display form, e.g. "a1b2c3d4e5f60718…". */
+    private static String shortFingerprint(String fingerprint) {
+        if (fingerprint.length() <= 20) {
+            return fingerprint;
+        }
+        return fingerprint.substring(0, 16) + "…";
+    }
+
+    /** Colon-separated uppercase form, e.g. "A1:B2:…", for visual comparison. */
+    private static String formatFingerprint(String fingerprint) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < fingerprint.length(); i += 2) {
+            if (i > 0) {
+                sb.append(':');
+            }
+            sb.append(fingerprint, i, Math.min(i + 2, fingerprint.length()));
+        }
+        return sb.toString().toUpperCase(Locale.US);
     }
 
     private String languageLabel(String language) {

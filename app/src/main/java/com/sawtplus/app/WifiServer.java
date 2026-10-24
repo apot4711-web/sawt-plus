@@ -35,8 +35,37 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.net.ssl.SSLContext;
+
 /**
- * Wi-Fi PCM streaming with mDNS discovery and token pairing.
+ * Wi-Fi PCM streaming over TLS (wss://) with mDNS discovery and token pairing.
+ *
+ * <p><b>Wire contract for the PC client (TLS):</b>
+ * <ul>
+ *   <li>Transport is <b>wss://HOST:PORT only</b> — the server speaks no
+ *       cleartext ws://. TLS 1.2+ is enforced (see TlsServerFactory).</li>
+ *   <li>Server certificate: self-signed X.509, EC P-256 on API 23+,
+ *       RSA-2048 on API 21-22 (AndroidKeyStore has no EC before API 23),
+ *       CN "SawtPlus &lt;device-id&gt;" (no '+': it is special in RFC 2253
+ *       DNs), 25-year validity. It is NOT anchored to
+ *       any CA — the client must NOT use system trust.</li>
+ *   <li>Instead the client pins the SHA-256 fingerprint (TOFU). It learns the
+ *       expected value (lowercase hex, 64 chars) from:
+ *       <ul>
+ *         <li>the mDNS TXT record attribute {@code sha256}, or</li>
+ *         <li>the JSON {@code cert_sha256} field of the {@code paired},
+ *             {@code pair_required} and {@code ready} control messages.</li>
+ *       </ul></li>
+ *   <li>At pairing time the client stores {@code cert_sha256} alongside the
+ *       pairing token. On every later connect, after the TLS handshake, it
+ *       computes SHA-256 over the presented leaf certificate
+ *       ({@code cert.getEncoded()}) and aborts the connection on mismatch.
+ *       A changed fingerprint means re-pairing (new 6-digit code).</li>
+ *   <li>The 6-digit pairing code remains the authentication mechanism;
+ *       pairing messages keep their shape — only the transport scheme changed
+ *       from ws:// to wss://. The pairing token therefore never travels in
+ *       cleartext anymore.</li>
+ * </ul>
  */
 final class WifiServer extends WebSocketServer {
     private static final String TAG = App.TAG;
@@ -55,6 +84,7 @@ final class WifiServer extends WebSocketServer {
     private final int port;
     private final String deviceId;
     private final String deviceName;
+    private final String certFingerprint;
     private final SecureRandom random = new SecureRandom();
 
     private final Map<WebSocket, Session> sessions = new ConcurrentHashMap<>();
@@ -80,6 +110,17 @@ final class WifiServer extends WebSocketServer {
         this.port = getAddress().getPort();
         this.deviceId = tokens.deviceId();
         this.deviceName = sanitizeDeviceName(tokens.deviceName());
+        // TLS-only transport. Fail closed: if the certificate or SSLContext
+        // cannot be created, the constructor throws and the server never
+        // starts in cleartext.
+        try {
+            SSLContext tls = TlsCertificate.serverContext(this.context, this.deviceId);
+            setWebSocketFactory(new TlsServerFactory(tls));
+            certFingerprint = TlsCertificate.fingerprint(this.context, this.deviceId);
+        } catch (Exception e) {
+            throw new IOException("TLS setup failed", e);
+        }
+        ServiceState.certFingerprint = certFingerprint;
         setReuseAddr(true);
         setConnectionLostTimeout(30);
         ServiceState.deviceName = deviceName;
@@ -89,6 +130,14 @@ final class WifiServer extends WebSocketServer {
 
     int port() {
         return port;
+    }
+
+    /**
+     * SHA-256 fingerprint (lowercase hex) of the server's self-signed TLS
+     * certificate. Clients pin this value (TOFU); see the class Javadoc.
+     */
+    String certFingerprint() {
+        return certFingerprint;
     }
 
     void startServer() {
@@ -251,7 +300,7 @@ final class WifiServer extends WebSocketServer {
     @Override
     public void onStart() {
         setConnectionLostTimeout(30);
-        Log.i(TAG, "Wi-Fi WebSocket server started on port " + port);
+        Log.i(TAG, "Wi-Fi wss server started on port " + port);
     }
 
     // ------------------------------------------------------------------
@@ -292,6 +341,23 @@ final class WifiServer extends WebSocketServer {
         }
     }
 
+    /**
+     * Closes every authenticated client connection, e.g. after the user
+     * revokes all pairing tokens. Per-connection cleanup runs through
+     * onClose, so hub sinks are removed and the client count is updated
+     * there. Affected PCs get "pair_required" on their next hello and must
+     * pair again.
+     */
+    void dropAllClients() {
+        for (WebSocket conn : clients.keySet()) {
+            try {
+                conn.close(4000, "pairing revoked");
+            } catch (Exception ignored) {
+            }
+        }
+        Log.i(TAG, "dropped all Wi-Fi clients after token revocation");
+    }
+
     private void sendReady(WebSocket conn) {
         JSONObject obj = new JSONObject();
         try {
@@ -304,6 +370,7 @@ final class WifiServer extends WebSocketServer {
             obj.put("format", "s16le");
             obj.put("frame_ms", App.FRAME_MS);
             obj.put("clients", clients.size());
+            obj.put("cert_sha256", certFingerprint);
         } catch (JSONException ignored) {
         }
         conn.send(obj.toString());
@@ -317,6 +384,7 @@ final class WifiServer extends WebSocketServer {
             obj.put("id", deviceId);
             obj.put("name", deviceName);
             obj.put("pairing", true);
+            obj.put("cert_sha256", certFingerprint);
         } catch (JSONException ignored) {
         }
         conn.send(obj.toString());
@@ -330,6 +398,7 @@ final class WifiServer extends WebSocketServer {
             obj.put("id", deviceId);
             obj.put("name", deviceName);
             obj.put("token", token);
+            obj.put("cert_sha256", certFingerprint);
         } catch (JSONException ignored) {
         }
         conn.send(obj.toString());
@@ -517,6 +586,8 @@ final class WifiServer extends WebSocketServer {
             info.setAttribute("name", deviceName);
             info.setAttribute("v", "1");
             info.setAttribute("pair", "1");
+            // TLS certificate fingerprint for client pinning (TOFU).
+            info.setAttribute("sha256", certFingerprint);
         } catch (IllegalArgumentException e) {
             Log.w(TAG, "mDNS attributes", e);
         }

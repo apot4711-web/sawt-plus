@@ -14,6 +14,16 @@ final class AudioCapture {
         void onFrame(byte[] data, int length);
 
         void onError(String message);
+
+        /**
+         * Called when the capture thread dies from a read error (e.g. the
+         * microphone was preempted by a phone call), or when
+         * startRecording() throws during start() (e.g. the mic is briefly
+         * held by another app). The capture has already been marked stopped
+         * and the recorder released at this point; the error is considered
+         * transient and the listener may try to restart capture.
+         */
+        void onCaptureInterrupted();
     }
 
     private static final String TAG = App.TAG;
@@ -38,16 +48,36 @@ final class AudioCapture {
         return running;
     }
 
-    synchronized void start() {
+    void start() {
+        boolean startFailed;
+        synchronized (this) {
+            startFailed = startLocked();
+        }
+        // Notify outside the lock: the listener (StreamHub) takes its own
+        // monitor in onCaptureInterrupted(), so notifying under this lock
+        // would risk a lock-ordering hazard. Matches handleReadError().
+        if (startFailed) {
+            listener.onCaptureInterrupted();
+        }
+    }
+
+    /**
+     * Brings the recorder up. Must be called with the AudioCapture monitor
+     * held. Returns true when startRecording() threw; the recorder has been
+     * released and running reset to false in that case, and the caller must
+     * notify the listener outside the lock so the interruption/restart path
+     * can retry.
+     */
+    private boolean startLocked() {
         if (running) {
-            return;
+            return false;
         }
 
         int channelMask = channels == 2 ? AudioFormat.CHANNEL_IN_STEREO : AudioFormat.CHANNEL_IN_MONO;
         int minBuffer = AudioRecord.getMinBufferSize(rate, channelMask, AudioFormat.ENCODING_PCM_16BIT);
         if (minBuffer <= 0) {
             listener.onError("AudioRecord does not support " + rate + " Hz");
-            return;
+            return false;
         }
 
         int frameBytes = rate * frameMs / 1000 * channels * 2;
@@ -78,11 +108,30 @@ final class AudioCapture {
 
         if (recorder == null) {
             listener.onError("Could not initialize the microphone (is RECORD_AUDIO granted?)");
-            return;
+            return false;
         }
 
         running = true;
-        recorder.startRecording();
+        try {
+            recorder.startRecording();
+        } catch (IllegalStateException | SecurityException e) {
+            // startRecording() can throw when the mic is momentarily
+            // unavailable (permission revoked at runtime, another app holding
+            // it exclusively). Tear down and report a start failure instead
+            // of letting the exception escape: on the ADB path that would
+            // kill the server thread, and on the Wi-Fi path it would abort
+            // the restart callback. Routed through onCaptureInterrupted() so
+            // the existing retry scheduler (capped attempts + backoff)
+            // handles it like any other interruption.
+            Log.w(TAG, "AudioRecord.startRecording() failed", e);
+            try {
+                recorder.release();
+            } catch (Exception ignored) {
+            }
+            recorder = null;
+            running = false;
+            return true;
+        }
 
         final int readSize = frameBytes;
         thread = new Thread(() -> {
@@ -93,14 +142,43 @@ final class AudioCapture {
                 if (n > 0) {
                     listener.onFrame(buffer, n);
                 } else if (n < 0) {
-                    if (running) {
-                        listener.onError("AudioRecord read error: " + n);
-                    }
+                    handleReadError("AudioRecord read error: " + n);
                     break;
                 }
             }
         }, "sawt-capture");
         thread.start();
+        return false;
+    }
+
+    /**
+     * Called from the capture thread when AudioRecord.read() fails (e.g. the
+     * microphone was preempted by a phone call). Marks the capture as stopped
+     * and releases the recorder — a fresh AudioRecord is required to recover —
+     * then notifies the listener so it can attempt a restart. The listener is
+     * notified outside the lock to avoid lock-ordering hazards. Idempotent: a
+     * no-op if stop() already ran (which also unblocks the read with an
+     * error).
+     */
+    private void handleReadError(String message) {
+        boolean notify;
+        synchronized (this) {
+            notify = running;
+            if (running) {
+                running = false;
+                try {
+                    if (recorder != null) {
+                        recorder.release();
+                    }
+                } catch (Exception ignored) {
+                }
+                recorder = null;
+            }
+        }
+        if (notify) {
+            Log.w(TAG, message);
+            listener.onCaptureInterrupted();
+        }
     }
 
     synchronized void stop() {

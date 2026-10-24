@@ -1,10 +1,12 @@
 package daemon
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -45,7 +47,9 @@ func TestStreamFromFakePhone(t *testing.T) {
 
 	up := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
 	frames := 20
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// TLS-only transport: the fake phone serves wss:// with a self-signed
+	// cert; the daemon pins it via TOFU on first connect.
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := up.Upgrade(w, r, nil)
 		if err != nil {
 			return
@@ -121,6 +125,70 @@ func TestStreamFromFakePhone(t *testing.T) {
 	}
 	if status.Device != "Fake Phone" {
 		t.Fatalf("device = %q", status.Device)
+	}
+}
+
+// TestTLSPinningEnforced verifies the wss:// certificate-pinning behavior:
+// TOFU accepts and observes on first use, a correct pin connects, and a
+// wrong pin fails closed before any token is sent.
+func TestTLSPinningEnforced(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	up := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := up.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		time.Sleep(300 * time.Millisecond)
+	}))
+	defer server.Close()
+	u, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	realFP := certFingerprint(server.Certificate().Raw)
+	if !validFingerprint(realFP) {
+		t.Fatalf("test server fingerprint invalid: %q", realFP)
+	}
+
+	cfg := config.Default()
+	cfg.Daemon.Reconnect = false
+	d := New(cfg)
+	defer d.Shutdown()
+	ctx := context.Background()
+
+	// 1. TOFU: no pin stored → accept and observe the fingerprint.
+	ws, observed, err := d.dialWSS(ctx, u.Host, "")
+	if err != nil {
+		t.Fatalf("TOFU dial: %v", err)
+	}
+	ws.Close()
+	if observed != realFP {
+		t.Fatalf("observed = %q, want %q", observed, realFP)
+	}
+
+	// 2. Correct pin → connect.
+	ws, _, err = d.dialWSS(ctx, u.Host, realFP)
+	if err != nil {
+		t.Fatalf("pinned dial: %v", err)
+	}
+	ws.Close()
+
+	// 3. Wrong pin → fail closed during the TLS handshake.
+	wrong := strings.Repeat("b", 64)
+	if _, _, err := d.dialWSS(ctx, u.Host, wrong); err == nil ||
+		!strings.Contains(err.Error(), "fingerprint mismatch") {
+		t.Fatalf("want fingerprint mismatch error, got %v", err)
+	}
+
+	// 4. streamWiFi surfaces the mismatch as a connect error (token never sent).
+	entry := config.DeviceEntry{Address: u.Host, Token: "tok", Name: "Fake", CertSHA256: wrong}
+	if err := d.streamWiFi(ctx, entry); err == nil ||
+		!strings.Contains(err.Error(), "fingerprint mismatch") {
+		t.Fatalf("streamWiFi: want fingerprint mismatch error, got %v", err)
 	}
 }
 

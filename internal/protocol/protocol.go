@@ -33,6 +33,9 @@ type Message struct {
 	Error      string  `json:"error,omitempty"`
 	RetryAfter int64   `json:"retry_after,omitempty"`
 	T          int64   `json:"t,omitempty"`
+	// CertSHA256 is the SHA-256 fingerprint (lowercase hex, 64 chars) of the
+	// phone's TLS leaf certificate, sent in paired/pair_required/ready.
+	CertSHA256 string `json:"cert_sha256,omitempty"`
 }
 
 func Encode(m Message) ([]byte, error) {

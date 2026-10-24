@@ -95,6 +95,10 @@ type DeviceEntry struct {
 	Name    string `toml:"name,omitempty"`
 	Address string `toml:"address"`
 	Token   string `toml:"token,omitempty"`
+	// CertSHA256 pins the phone's TLS certificate (SHA-256 of the leaf
+	// cert DER, lowercase hex). Stored at pairing time (TOFU); every later
+	// connect aborts on mismatch.
+	CertSHA256 string `toml:"cert_sha256,omitempty"`
 }
 
 func Default() *Config {
@@ -321,6 +325,9 @@ func (c *Config) UpsertDevice(d DeviceEntry) {
 			}
 			if d.Token != "" {
 				c.Devices[i].Token = d.Token
+			}
+			if d.CertSHA256 != "" {
+				c.Devices[i].CertSHA256 = d.CertSHA256
 			}
 			return
 		}

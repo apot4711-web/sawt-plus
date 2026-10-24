@@ -35,6 +35,9 @@ type Device struct {
 	Version   string `json:"version"`
 	Pairing   bool   `json:"pairing"`
 	Transport string `json:"transport"`
+	// CertSHA256 is the phone's TLS certificate fingerprint from the mDNS
+	// TXT "sha256" attribute (untrusted discovery hint, validated at use).
+	CertSHA256 string `json:"cert_sha256"`
 }
 
 func (d Device) Label() string {
@@ -42,6 +45,15 @@ func (d Device) Label() string {
 		return d.Name
 	}
 	return d.Address
+}
+
+// BrowseMDNS waits up to timeout for Sawt devices via mDNS only (no active
+// subnet scan). Useful when only the TXT attributes of a known device are
+// needed.
+func BrowseMDNS(ctx context.Context, timeout time.Duration) ([]Device, error) {
+	browseCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return browseMDNS(browseCtx)
 }
 
 // Browse waits up to timeout for Sawt devices and merges the results
@@ -134,6 +146,9 @@ func mergeDevice(byID map[string]Device, d Device) {
 	if (prev.Version == "" || prev.Version == "scan") && d.Version != "" {
 		prev.Version = d.Version
 	}
+	if prev.CertSHA256 == "" && d.CertSHA256 != "" {
+		prev.CertSHA256 = d.CertSHA256
+	}
 	prev.Pairing = prev.Pairing || d.Pairing
 	byID[d.ID] = prev
 }
@@ -198,6 +213,9 @@ func fromEntry(e *zeroconf.ServiceEntry) Device {
 			d.Version = value
 		case "pair":
 			d.Pairing = value == "1" || strings.EqualFold(value, "true")
+		case "sha256":
+			// Untrusted TOFU hint; the daemon validates the shape at use.
+			d.CertSHA256 = strings.ToLower(strings.TrimSpace(value))
 		}
 	}
 
@@ -293,6 +311,9 @@ func parseAvahi(out string) []Device {
 				d.Version = value
 			case "pair":
 				d.Pairing = value == "1" || strings.EqualFold(value, "true")
+			case "sha256":
+				// Untrusted TOFU hint; the daemon validates the shape at use.
+				d.CertSHA256 = strings.ToLower(strings.TrimSpace(value))
 			}
 		}
 		if d.ID == "" {

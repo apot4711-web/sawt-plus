@@ -133,10 +133,48 @@ final class TokenStore {
         return tokens().contains(hash(token));
     }
 
+    /**
+     * Same as {@link #isValid(String)} but compares with
+     * {@link MessageDigest#isEqual} so a local attacker cannot use timing
+     * differences to test token guesses (used by the ADB socket handshake).
+     */
+    boolean isValidConstantTime(String token) {
+        if (token == null || token.isEmpty()) {
+            return false;
+        }
+        byte[] candidate = hash(token).getBytes(StandardCharsets.UTF_8);
+        boolean ok = false;
+        for (String stored : tokens()) {
+            if (MessageDigest.isEqual(stored.getBytes(StandardCharsets.UTF_8), candidate)) {
+                ok = true;
+            }
+        }
+        return ok;
+    }
+
     void add(String token) {
         Set<String> tokens = new HashSet<>(tokens());
         tokens.add(hash(token));
         prefs.edit().putStringSet(KEY_TOKENS, tokens).apply();
+    }
+
+    void remove(String token) {
+        if (token == null || token.isEmpty()) {
+            return;
+        }
+        Set<String> tokens = new HashSet<>(tokens());
+        tokens.remove(hash(token));
+        prefs.edit().putStringSet(KEY_TOKENS, tokens).apply();
+    }
+
+    /**
+     * Revokes every pairing token. Live sessions must be dropped separately
+     * (see WifiServer.dropAllClients and AdbServer.dropClient); any future
+     * "hello" handshake presenting a revoked token is rejected and the PC
+     * is told to pair again.
+     */
+    void removeAll() {
+        prefs.edit().remove(KEY_TOKENS).apply();
     }
 
     String newToken() {

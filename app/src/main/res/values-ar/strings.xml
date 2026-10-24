@@ -48,6 +48,14 @@
     <string name="settings_language">اللغة</string>
     <string name="settings_theme">الثيم</string>
     <string name="settings_device_name">اسم الجهاز</string>
+    <string name="settings_paired_devices">الأجهزة المقترنة</string>
+    <string name="unpair_all">إلغاء اقتران الكل</string>
+    <string name="unpair_all_title">إلغاء اقتران كل الأجهزة؟</string>
+    <string name="unpair_all_done">تم إلغاء اقتران كل الأجهزة</string>
+    <string name="unpair_none">لا توجد أجهزة مقترنة</string>
+    <string name="settings_cert_fingerprint">بصمة الشهادة</string>
+    <string name="cert_fingerprint_title">بصمة شهادة TLS</string>
+    <string name="cert_fingerprint_message">يتحقق الحاسوب من هذه البصمة عند الاتصال عبر Wi-Fi. البصمة:\n\n%s</string>
     <string name="device_name_hint">الاسم الذي يظهر للحاسوب</string>
     <string name="device_name_saved">تم حفظ اسم الجهاز</string>
     <string name="settings_change">تغيير</string>
@@ -84,5 +92,14 @@
         <item quantity="few">%d عملاء</item>
         <item quantity="many">%d عميلاً</item>
         <item quantity="other">%d عميل</item>
+    </plurals>
+
+    <plurals name="unpair_all_message">
+        <item quantity="zero">لا توجد أجهزة مقترنة</item>
+        <item quantity="one">سيؤدي هذا إلى فصل جهاز مقترن واحد. سيحتاج إلى الاقتران مجدداً برمز جديد.</item>
+        <item quantity="two">سيؤدي هذا إلى فصل جهازين مقترنين. سيحتاجان إلى الاقتران مجدداً برمز جديد.</item>
+        <item quantity="few">سيؤدي هذا إلى فصل %d أجهزة مقترنة. ستحتاج إلى الاقتران مجدداً برمز جديد.</item>
+        <item quantity="many">سيؤدي هذا إلى فصل %d جهازاً مقترناً. ستحتاج إلى الاقتران مجدداً برمز جديد.</item>
+        <item quantity="other">سيؤدي هذا إلى فصل %d جهاز مقترن. ستحتاج إلى الاقتران مجدداً برمز جديد.</item>
     </plurals>
 </resources>

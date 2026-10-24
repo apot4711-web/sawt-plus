@@ -603,9 +603,9 @@
 
     .toast {
       position: fixed;
-      inset-inline: 50%;
+      left: 50%;
       bottom: 24px;
-      transform: translateX(50%);
+      transform: translateX(-50%);
       z-index: 80;
       max-width: min(560px, calc(100vw - 32px));
       padding: 14px 18px;
@@ -619,7 +619,7 @@
     .toast.hidden {
       opacity: 0;
       pointer-events: none;
-      transform: translateX(50%) translateY(8px);
+      transform: translateX(-50%) translateY(8px);
     }
     .toast.error { background: var(--error-container); color: var(--on-error-container); }
 

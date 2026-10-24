@@ -10,7 +10,7 @@
   <p dir="ltr"><a href="README.en.md">English</a> · <b>العربية</b></p>
   <p dir="ltr">
     <a href="https://github.com/apot4711-web/sawt-plus/releases/latest"><img alt="أحدث إصدار" src="https://img.shields.io/github/v/release/apot4711-web/sawt-plus?style=for-the-badge&color=3daee9&label=release"></a>
-    <img alt="الترخيص: MIT" src="https://img.shields.io/badge/license-MIT-8a5cd6?style=for-the-badge">
+    <img alt="الترخيص: GPLv3" src="https://img.shields.io/badge/license-GPLv3-8a5cd6?style=for-the-badge">
     <img alt="أندرويد 5.0 فأحدث" src="https://img.shields.io/badge/Android-5.0%2B-3ddc84?style=for-the-badge&logo=android&logoColor=white">
     <img alt="لينكس" src="https://img.shields.io/badge/Linux-PipeWire-ffbc00?style=for-the-badge&logo=linux&logoColor=black">
     <img alt="Wi-Fi" src="https://img.shields.io/badge/transport-Wi--Fi-1d99f3?style=for-the-badge&logo=wifi&logoColor=white">
@@ -78,12 +78,12 @@
 
 ## ما هو صوت+؟
 
-صوت+ يحوّل هاتف أندرويد إلى ميكروفون لاسلكي لحاسوب لينكس. يلتقط الهاتف الصوت من
-ميكروفونه، ويبثّه عبر شبكة Wi-Fi المحلية إلى برنامج صغير على الحاسوب، فيظهر
+صوت+ يحوّل هاتف أندرويد إلى ميكروفون لحاسوب لينكس. يلتقط الهاتف الصوت من
+ميكروفونه، ويبثّه عبر شبكة Wi-Fi المحلية أو عبر كابل USB إلى برنامج صغير على الحاسوب، فيظهر
 كمصدر صوت باسم `sawt-plus` تستطيع اختياره في أي تطبيق اجتماعات أو تسجيل.
 
 المشروع مبني على [`gdzx/audiosource`](https://github.com/gdzx/audiosource)، لكنه
-يستخدم Wi-Fi كاتصال أساسي، ويضيف الاقتران والاكتشاف والتحكم في مستوى الصوت
+يوفّر اتصالين متكافئين — Wi-Fi و USB/ADB — ويضيف الاقتران والاكتشاف والتحكم في مستوى الصوت
 وتطبيق أندرويد بتصميم Material 3. هو مشروع منفصل ولا يستبدل التطبيق الأصلي.
 
 ---
@@ -95,12 +95,12 @@
 | الميزة | ماذا تعني لك |
 | --- | --- |
 | اتصال Wi-Fi محلي | جودة ثابتة واستجابة سريعة دون كابلات |
-| USB/ADB كبديل | خيار احتياطي عندما لا تتوفر شبكة مشتركة |
+| اتصال USB/ADB | نفس التجربة عبر الكابل: اتصال مباشر واتصال تلقائي عند التوصيل، بدون حاجة لشبكة مشتركة |
 | اقتران مرة واحدة | رمز من ٦ أرقام، ثم اتصال تلقائي |
 | تحكم كامل | من الهاتف أو الطرفية أو صفحة ويب محلية |
 | واجهة عربية وإنجليزية | مع دعم كامل للاتجاه من اليمين إلى اليسار |
 | بدون سحابة | الصوت يبقى داخل شبكتك المحلية |
-| مفتوح المصدر | ترخيص MIT، والكود متاح للجميع |
+| مفتوح المصدر | مرخّص بـ GPLv3: حر للاستخدام، ويبقى مفتوح المصدر دائماً |
 
 ---
 
@@ -111,7 +111,7 @@
 | الخطوة | ما يحدث |
 | --- | --- |
 | 1 | يلتقط الهاتف الصوت من الميكروفون |
-| 2 | يبثّه عبر Wi-Fi إلى برنامج صوت+ على الحاسوب |
+| 2 | يبثّه عبر Wi-Fi أو USB إلى برنامج صوت+ على الحاسوب |
 | 3 | يستقبل البرنامج الصوت ويحوّله إلى مصدر PipeWire أو PulseAudio |
 | 4 | يظهر المصدر باسم `sawt-plus` في تطبيقات الاجتماعات والتسجيل |
 | 5 | تتحكم في مستوى الصوت من الهاتف أو الطرفية أو صفحة الويب |
@@ -119,7 +119,7 @@
 ```text
 Phone microphone
       |
-      |  Wi-Fi (WebSocket) - PCM 48 kHz
+      |  Wi-Fi / USB (WebSocket) - PCM 48 kHz
       v
 Sawt+ daemon on Linux
       |
@@ -217,7 +217,7 @@ Meeting and recording apps
 <details>
 <summary><b>هل المشروع مجاني؟</b></summary>
 <br>
-نعم، مفتوح المصدر بترخيص MIT.
+نعم، مفتوح المصدر بترخيص GPLv3 — يبقى حراً ومفتوحاً للجميع دائماً.
 </details>
 
 ---
@@ -245,7 +245,7 @@ Meeting and recording apps
 
 ## الترخيص
 
-MIT. راجع [LICENSE](LICENSE).
+GPLv3. راجع [LICENSE](LICENSE).
 
 ---
 

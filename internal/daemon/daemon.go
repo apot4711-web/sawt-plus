@@ -93,12 +93,19 @@ type Daemon struct {
 
 	cfgMu sync.RWMutex
 
-	mu         sync.RWMutex
-	status     Status
-	source     audioSource
-	logs       []LogEntry
-	closed     bool
-	lastTarget string
+	mu     sync.RWMutex
+	status Status
+	// lastStatusBroadcast is the time of the most recent "status" event push.
+	// It lets the hot audio path throttle broadcasts (see
+	// broadcastStatusThrottled) while state transitions still push immediately.
+	lastStatusBroadcast time.Time
+	source              audioSource
+	logs                []LogEntry
+	closed              bool
+	lastTarget          string
+	// pairThrottle maps a normalized target address to its pairing-attempt
+	// throttle state. Guarded by mu.
+	pairThrottle map[string]*pairThrottleState
 
 	subs  map[chan Event]struct{}
 	feeds map[chan []byte]struct{}
@@ -121,7 +128,7 @@ type Daemon struct {
 func New(cfg *config.Config) *Daemon {
 	ctx, cancel := context.WithCancel(context.Background())
 	now := time.Now()
-	return &Daemon{
+	d := &Daemon{
 		cfg:     cfg,
 		cfgPath: config.Path(),
 		status: Status{
@@ -137,6 +144,10 @@ func New(cfg *config.Config) *Daemon {
 		baseCtx: ctx,
 		cancel:  cancel,
 	}
+	// USB hotplug auto-connect for previously-paired phones. Silent no-op
+	// when adb is not installed.
+	d.startADBHotplug()
+	return d
 }
 
 // Config returns a snapshot of the configuration. Callers must not keep the
@@ -162,6 +173,48 @@ type SavedDevice struct {
 // PCM frame. It tolerates small gaps (jitter, scheduling) without keeping the
 // UI marked active long after the stream stopped.
 const activeWindow = 3 * time.Second
+
+// statusPushInterval is the minimum interval between status broadcasts
+// triggered by the audio path. ProcessPCM runs ~50 times per second; taking a
+// full Status snapshot and fanning it out to every SSE/WebSocket subscriber on
+// each frame wastes CPU and floods subscribers, so the audio path throttles to
+// this interval. State transitions (setState) and user actions (SetGain,
+// SetMute) still broadcast immediately via broadcastStatus.
+const statusPushInterval = 500 * time.Millisecond
+
+// Inbound WebSocket sizing. The handshake exchanges only small JSON control
+// messages, while the audio stream carries s16le PCM frames whose size the
+// peer announces in "ready" (rate*frameMS/1000*channels*2 bytes; 48000 Hz
+// mono 20 ms = 1920 B). Reads are capped at a small multiple of the
+// negotiated frame with an absolute ceiling, so a rogue peer cannot force
+// the multi-megabyte ApplyGain/broadcast copies the old 16 MB limit allowed.
+const (
+	wsHandshakeReadBytes = 64 << 10  // 64 KiB: handshake is JSON only
+	wsReadLimitFactor    = 4         // headroom over the negotiated frame
+	maxWSReadBytes       = 256 << 10 // 256 KiB: absolute ceiling
+)
+
+// Pairing-code brute-force protection. The code is 6 digits (10^6
+// combinations) and each attempt is one LAN round-trip, so without
+// client-side throttling an exhaustive search is feasible in hours. These
+// bounds make guessing infeasible while staying invisible to a legitimate
+// user (the first attempt is never delayed).
+const (
+	pairBaseBackoff = 2 * time.Second
+	pairMaxBackoff  = 60 * time.Second
+	pairMaxFails    = 8
+	pairLockout     = 5 * time.Minute
+)
+
+// pairThrottleState tracks consecutive rejected pairing attempts against one
+// normalized target address. Guarded by Daemon.mu. Only explicit server
+// rejections ("error" replies, i.e. wrong codes) are counted — transport
+// errors never throttle, so a network blip can't lock a user out.
+type pairThrottleState struct {
+	fails        int           // consecutive rejections
+	backoff      time.Duration // delay enforced before the next attempt
+	blockedUntil time.Time     // no attempts before this time
+}
 
 func (d *Daemon) SavedDevices() []SavedDevice {
 	// Status() snapshots the current device and active window before taking the
@@ -245,7 +298,24 @@ func (d *Daemon) setState(state State, err error) {
 }
 
 func (d *Daemon) broadcastStatus() {
+	d.mu.Lock()
+	d.lastStatusBroadcast = time.Now()
+	d.mu.Unlock()
 	d.broadcast(Event{Type: "status", Status: d.Status()})
+}
+
+// broadcastStatusThrottled pushes a status event at most once per
+// statusPushInterval. It is used on the hot audio path (ProcessPCM); the
+// timestamp is refreshed by every broadcastStatus call, so a recent state
+// transition also suppresses a redundant audio-path push.
+func (d *Daemon) broadcastStatusThrottled() {
+	d.mu.RLock()
+	recent := time.Since(d.lastStatusBroadcast) < statusPushInterval
+	d.mu.RUnlock()
+	if recent {
+		return
+	}
+	d.broadcastStatus()
 }
 
 func (d *Daemon) broadcast(ev Event) {
@@ -600,7 +670,11 @@ func (d *Daemon) wifiLoop(ctx context.Context, entry config.DeviceEntry) {
 }
 
 // rediscover refreshes a saved device's address after the phone's DHCP lease
-// changes. It matches by stable ID first and by name as a fallback.
+// changes. mDNS is unauthenticated, so a discovered name or ID only *selects*
+// a candidate — the candidate is adopted only after it proves its identity by
+// presenting the pinned TLS certificate during a tokenless handshake. A
+// spoofed mDNS entry can therefore never become the saved device, and the
+// pairing token is never transmitted to it.
 func (d *Daemon) rediscover(ctx context.Context, entry *config.DeviceEntry) bool {
 	if entry.ID == "" && entry.Name == "" {
 		return false
@@ -611,6 +685,13 @@ func (d *Daemon) rediscover(ctx context.Context, entry *config.DeviceEntry) bool
 	if err != nil && len(devices) == 0 {
 		return false
 	}
+	return d.adoptRediscoveredAddress(browseCtx, entry, devices, d.verifyRediscoverCandidate)
+}
+
+// adoptRediscoveredAddress scans mDNS devices for the saved entry (stable ID
+// first, name as fallback) and adopts the first candidate whose identity
+// verify confirms. verify must perform no token transmission.
+func (d *Daemon) adoptRediscoveredAddress(ctx context.Context, entry *config.DeviceEntry, devices []discovery.Device, verify func(context.Context, *config.DeviceEntry, string) bool) bool {
 	for _, dev := range devices {
 		if dev.Transport == "adb" || dev.Address == "" {
 			continue
@@ -622,7 +703,12 @@ func (d *Daemon) rediscover(ctx context.Context, entry *config.DeviceEntry) bool
 		}
 		addr := config.NormalizeAddress(dev.Address)
 		if addr == "" || addr == entry.Address {
-			return false
+			continue
+		}
+		// Identity check: the certificate fingerprint is the device's
+		// identity, not its mDNS name or address (both spoofable).
+		if !verify(ctx, entry, addr) {
+			continue
 		}
 		oldAddr := entry.Address
 		entry.Address = addr
@@ -643,16 +729,41 @@ func (d *Daemon) rediscover(ctx context.Context, entry *config.DeviceEntry) bool
 	return false
 }
 
+// verifyRediscoverCandidate reports whether the endpoint at addr proves it is
+// the saved device by presenting the pinned TLS certificate. The handshake
+// is tokenless: dialWSS aborts inside the TLS handshake on a fingerprint
+// mismatch, before any application data — so a spoofed mDNS entry can never
+// learn the pairing token. Fail closed: with no pinned certificate (paired
+// before TLS existed) there is nothing to verify against, so mDNS is never
+// followed; re-pair with a new 6-digit code to establish the pin.
+func (d *Daemon) verifyRediscoverCandidate(ctx context.Context, entry *config.DeviceEntry, addr string) bool {
+	if entry.CertSHA256 == "" {
+		d.Log("warn", "rediscover: no pinned certificate for %s; refusing to follow mDNS to %s (re-pair to establish identity)",
+			firstNonEmpty(entry.Name, entry.ID), addr)
+		return false
+	}
+	verifyCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+	ws, _, err := d.dialWSS(verifyCtx, addr, entry.CertSHA256)
+	if err != nil {
+		d.Log("warn", "rediscover: %s failed identity check: %v", addr, err)
+		return false
+	}
+	_ = ws.Close()
+	return true
+}
+
 func (d *Daemon) streamWiFi(ctx context.Context, entry config.DeviceEntry) error {
 	d.setState(StateConnecting, nil)
 	addr := entry.Address
-	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
-	url := "ws://" + addr + "/"
-	ws, _, err := dialer.DialContext(ctx, url, nil)
+	// wss:// only, with certificate pinning. On a fingerprint mismatch the
+	// handshake aborts here — the pairing token is never sent.
+	ws, observedFP, err := d.dialWSS(ctx, addr, entry.CertSHA256)
 	if err != nil {
 		return fmt.Errorf("connect to %s: %w", addr, err)
 	}
-	ws.SetReadLimit(16 << 20)
+	// Handshake phase: only small JSON control messages flow here.
+	ws.SetReadLimit(wsHandshakeReadBytes)
 	_ = ws.SetReadDeadline(time.Now().Add(30 * time.Second))
 
 	d.connMu.Lock()
@@ -678,6 +789,9 @@ func (d *Daemon) streamWiFi(ctx context.Context, entry config.DeviceEntry) error
 	}
 	switch msg.Type {
 	case "pair_required":
+		if err := checkAdvertisedFP(msg.CertSHA256, observedFP); err != nil {
+			return err
+		}
 		return ErrPairRequired
 	case "error":
 		return fmt.Errorf("device error: %s", msg.Error)
@@ -686,9 +800,18 @@ func (d *Daemon) streamWiFi(ctx context.Context, entry config.DeviceEntry) error
 		return fmt.Errorf("unexpected handshake message %q", msg.Type)
 	}
 
+	if err := checkAdvertisedFP(msg.CertSHA256, observedFP); err != nil {
+		return err
+	}
 	entry.Name = firstNonEmpty(msg.Name, entry.Name, addr)
 	entry.ID = firstNonEmpty(msg.ID, entry.ID)
 	entry.Address = addr
+	// Upgrade path: devices paired before TLS existed have no pin yet. Pin
+	// the presented certificate now (TOFU) so the next connect enforces it.
+	if entry.CertSHA256 == "" {
+		entry.CertSHA256 = observedFP
+		d.Log("info", "pinned TLS certificate for %s", firstNonEmpty(entry.Name, addr))
+	}
 
 	rate, channels, frameMS := msg.Rate, msg.Channels, msg.FrameMS
 	d.cfgMu.Lock()
@@ -721,6 +844,16 @@ func (d *Daemon) streamWiFi(ctx context.Context, entry config.DeviceEntry) error
 	d.status.Channels = channels
 	d.status.FrameMS = frameMS
 	d.mu.Unlock()
+
+	// Size the read limit from the negotiated audio format. The announced
+	// rate/channels/frameMS come from the peer, so clamp to the absolute
+	// ceiling — a rogue peer must not be able to inflate this.
+	frameBytes := int64(rate) * int64(frameMS) / 1000 * int64(channels) * 2
+	limit := frameBytes * wsReadLimitFactor
+	if limit <= 0 || limit > maxWSReadBytes {
+		limit = maxWSReadBytes
+	}
+	ws.SetReadLimit(limit)
 
 	if _, err := d.ensureSource(ctx); err != nil {
 		return err
@@ -861,7 +994,7 @@ func (d *Daemon) ProcessPCM(pcm []byte) {
 	d.broadcastPCM(pcm)
 	d.frames.Add(1)
 	d.bytes.Add(uint64(len(pcm)))
-	d.broadcastStatus()
+	d.broadcastStatusThrottled()
 }
 
 // Unpair removes a saved Wi-Fi pairing (and its token), stopping the stream
@@ -912,6 +1045,64 @@ func (d *Daemon) Unpair(target string) error {
 	return nil
 }
 
+// pairWait returns how long the caller must wait before attempting to pair
+// with addr, or an error if the target is temporarily locked out after too
+// many rejections. It never blocks; the caller sleeps without holding mu.
+func (d *Daemon) pairWait(addr string) (time.Duration, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	st := d.pairThrottle[addr]
+	if st == nil {
+		return 0, nil
+	}
+	if wait := time.Until(st.blockedUntil); wait > 0 {
+		if st.fails >= pairMaxFails {
+			return 0, fmt.Errorf("too many failed pairing attempts for %s; wait %s, then try again with a fresh code from the phone", addr, wait.Round(time.Second))
+		}
+		return wait, nil
+	}
+	return 0, nil
+}
+
+// pairNote records the outcome of a pairing attempt against addr. A success
+// clears the throttle state; a rejection grows the backoff exponentially up
+// to pairMaxBackoff, and after pairMaxFails consecutive rejections the
+// target is locked out for pairLockout. A positive retryAfter (the phone's
+// "retry_after" hint) extends the block accordingly.
+func (d *Daemon) pairNote(addr string, ok bool, retryAfter time.Duration) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if ok {
+		delete(d.pairThrottle, addr)
+		return
+	}
+	if d.pairThrottle == nil {
+		d.pairThrottle = make(map[string]*pairThrottleState)
+	}
+	st := d.pairThrottle[addr]
+	if st == nil {
+		st = &pairThrottleState{}
+		d.pairThrottle[addr] = st
+	}
+	st.fails++
+	if st.fails >= pairMaxFails {
+		st.blockedUntil = time.Now().Add(pairLockout)
+		return
+	}
+	if st.backoff <= 0 {
+		st.backoff = pairBaseBackoff
+	} else {
+		st.backoff *= 2
+		if st.backoff > pairMaxBackoff {
+			st.backoff = pairMaxBackoff
+		}
+	}
+	st.blockedUntil = time.Now().Add(st.backoff)
+	if retryAfter > 0 && time.Now().Add(retryAfter).After(st.blockedUntil) {
+		st.blockedUntil = time.Now().Add(retryAfter)
+	}
+}
+
 func (d *Daemon) Pair(ctx context.Context, target, code string) (config.DeviceEntry, error) {
 	entry, transport, err := d.ResolveDevice(target)
 	if err != nil {
@@ -925,11 +1116,31 @@ func (d *Daemon) Pair(ctx context.Context, target, code string) (config.DeviceEn
 	d.Disconnect()
 
 	addr := entry.Address
+	key := config.NormalizeAddress(addr)
+	if wait, err := d.pairWait(key); err != nil {
+		d.setState(StateError, err)
+		d.Log("warn", "pairing throttled: %v", err)
+		return entry, err
+	} else if wait > 0 {
+		d.Log("info", "pairing with %s throttled after failed attempts, waiting %s", addr, wait.Round(time.Second))
+		select {
+		case <-ctx.Done():
+			d.setState(StateError, ctx.Err())
+			return entry, ctx.Err()
+		case <-time.After(wait):
+		}
+	}
 	d.setState(StatePairing, nil)
 	d.Log("info", "pairing with %s", addr)
 
-	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
-	ws, _, err := dialer.DialContext(ctx, "ws://"+addr+"/", nil)
+	// Certificate pinning at pairing time (TOFU). Prefer the mDNS-advertised
+	// "sha256" hint when the target was discovered; otherwise accept the
+	// presented certificate and pin it below. The previously stored pin is
+	// deliberately NOT enforced here: the 6-digit code is the recovery
+	// authentication when the phone's certificate legitimately changed
+	// (e.g. app reinstall).
+	expectFP := d.mdnsFingerprintHint(ctx, addr)
+	ws, observedFP, err := d.dialWSS(ctx, addr, expectFP)
 	if err != nil {
 		d.setState(StateError, err)
 		d.Log("warn", "pairing failed: %v", err)
@@ -958,6 +1169,9 @@ func (d *Daemon) Pair(ctx context.Context, target, code string) (config.DeviceEn
 			continue
 		}
 		if reply.Type == "error" {
+			// Wrong code: count it toward brute-force throttling and honor
+			// the phone's backoff hint when present.
+			d.pairNote(key, false, time.Duration(reply.RetryAfter)*time.Second)
 			err := fmt.Errorf("pairing rejected: %s", reply.Error)
 			d.setState(StateError, err)
 			d.Log("warn", "pairing failed: %v", err)
@@ -966,14 +1180,21 @@ func (d *Daemon) Pair(ctx context.Context, target, code string) (config.DeviceEn
 		if reply.Type != "paired" {
 			continue
 		}
+		if err := checkAdvertisedFP(reply.CertSHA256, observedFP); err != nil {
+			d.setState(StateError, err)
+			d.Log("warn", "pairing failed: %v", err)
+			return entry, err
+		}
 		entry.Token = reply.Token
 		entry.Name = firstNonEmpty(reply.Name, entry.Name, addr)
 		entry.ID = firstNonEmpty(reply.ID, entry.ID)
 		entry.Address = addr
+		entry.CertSHA256 = observedFP
 		d.cfgMu.Lock()
 		d.cfg.UpsertDevice(entry)
 		saveErr := d.cfg.Save()
 		d.cfgMu.Unlock()
+		d.pairNote(key, true, 0)
 		if saveErr != nil {
 			return entry, fmt.Errorf("save config: %w", saveErr)
 		}
@@ -1012,9 +1233,41 @@ func (d *Daemon) adbLoop(ctx context.Context, target string) {
 	}
 }
 
+// adbToken returns the pairing token to present on the ADB transport.
+// The phone's ADB socket requires the same long-term pairing token as Wi-Fi,
+// so the device must have been paired over Wi-Fi at least once. The ADB
+// device serial cannot be matched to a saved entry, so exactly one paired
+// device must exist; otherwise the choice would be ambiguous.
+func (d *Daemon) adbToken() (string, error) {
+	d.cfgMu.RLock()
+	defer d.cfgMu.RUnlock()
+	var token string
+	count := 0
+	for _, dev := range d.cfg.Devices {
+		if dev.Token == "" {
+			continue
+		}
+		count++
+		token = dev.Token
+	}
+	switch {
+	case count == 1:
+		return token, nil
+	case count == 0:
+		return "", errors.New("no paired device: pair over Wi-Fi first (sawt pair HOST:PORT CODE)")
+	default:
+		return "", errors.New("multiple paired devices: unpair the ones you don't use (sawt unpair) or connect over Wi-Fi")
+	}
+}
+
 func (d *Daemon) streamADB(ctx context.Context, serial string) error {
 	if !adb.Available() {
 		return errors.New("adb not found")
+	}
+	// Fail fast when there is no credential for the phone's ADB handshake.
+	token, err := d.adbToken()
+	if err != nil {
+		return err
 	}
 	m := adb.New(serial)
 	d.setState(StateConnecting, nil)
@@ -1042,6 +1295,13 @@ func (d *Daemon) streamADB(ctx context.Context, serial string) error {
 		return err
 	}
 	defer conn.Close()
+
+	// Protocol v2 handshake: present the pairing token first. The phone
+	// closes the connection without starting capture if it is wrong.
+	_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	if _, err := fmt.Fprintf(conn, "TOKEN %s\n", token); err != nil {
+		return fmt.Errorf("adb auth: %w", err)
+	}
 
 	d.setState(StateStreaming, nil)
 	d.mu.Lock()

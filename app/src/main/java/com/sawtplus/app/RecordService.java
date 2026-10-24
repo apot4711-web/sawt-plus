@@ -27,6 +27,7 @@ public class RecordService extends Service {
     static final String ACTION_STOP = App.PKG + ".STOP";
     static final String ACTION_RELOAD = App.PKG + ".RELOAD";
     static final String ACTION_NEW_CODE = App.PKG + ".NEW_CODE";
+    static final String ACTION_UNPAIR_ALL = App.PKG + ".UNPAIR_ALL";
 
     private static final String CHANNEL_ID = "sawt";
     private static final int NOTIFICATION_ID = 1;
@@ -66,6 +67,15 @@ public class RecordService extends Service {
         context.startService(intent);
     }
 
+    /**
+     * Revokes all pairing tokens and drops every live client session
+     * (Wi-Fi and ADB). Affected PCs must pair again with a new code.
+     */
+    static void unpairAll(Context context) {
+        Intent intent = new Intent(context, RecordService.class).setAction(ACTION_UNPAIR_ALL);
+        context.startService(intent);
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -95,6 +105,15 @@ public class RecordService extends Service {
             applyTransportPreference();
         } else if (ACTION_NEW_CODE.equals(action) && wifiServer != null) {
             wifiServer.rotatePairingCode();
+        } else if (ACTION_UNPAIR_ALL.equals(action)) {
+            tokens.removeAll();
+            if (wifiServer != null) {
+                wifiServer.dropAllClients();
+            }
+            if (adbServer != null) {
+                adbServer.dropClient();
+            }
+            Log.i(TAG, "all pairing tokens revoked by user");
         }
 
         updateNotification();
@@ -107,12 +126,11 @@ public class RecordService extends Service {
         }
         Log.i(TAG, "starting service");
         hub = new StreamHub(this);
-        adbServer = new AdbServer(hub);
-        adbServer.start();
-
         if (tokens == null) {
             tokens = new TokenStore(this);
         }
+        adbServer = new AdbServer(hub, tokens);
+        adbServer.start();
         if (tokens.transportWifi()) {
             startWifi();
         }

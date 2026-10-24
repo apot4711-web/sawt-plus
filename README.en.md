@@ -10,7 +10,7 @@
   <p dir="ltr"><b>English</b> · <a href="README.md">العربية</a></p>
   <p dir="ltr">
     <a href="https://github.com/apot4711-web/sawt-plus/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/apot4711-web/sawt-plus?style=for-the-badge&color=3daee9&label=release"></a>
-    <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-8a5cd6?style=for-the-badge">
+    <img alt="License: GPLv3" src="https://img.shields.io/badge/license-GPLv3-8a5cd6?style=for-the-badge">
     <img alt="Android 5.0+" src="https://img.shields.io/badge/Android-5.0%2B-3ddc84?style=for-the-badge&logo=android&logoColor=white">
     <img alt="Linux" src="https://img.shields.io/badge/Linux-PipeWire-ffbc00?style=for-the-badge&logo=linux&logoColor=black">
     <img alt="Wi-Fi" src="https://img.shields.io/badge/transport-Wi--Fi-1d99f3?style=for-the-badge&logo=wifi&logoColor=white">
@@ -79,13 +79,13 @@
 
 ## What is Sawt+?
 
-Sawt+ turns an Android phone into a wireless microphone for a Linux computer. The
+Sawt+ turns an Android phone into a microphone for a Linux computer. The
 phone captures audio from its microphone and streams it over the local Wi-Fi
-network to a small program on the computer, where it appears as an audio source
+network or over a USB cable to a small program on the computer, where it appears as an audio source
 named `sawt-plus` that you can pick in any meeting or recording app.
 
 The project is based on [`gdzx/audiosource`](https://github.com/gdzx/audiosource),
-but uses Wi-Fi as the primary connection and adds pairing, discovery, input-level
+but offers two equal connections — Wi-Fi and USB/ADB — and adds pairing, discovery, input-level
 control, and a Material 3 Android app. It is a separate project and does not
 replace the original app.
 
@@ -98,12 +98,12 @@ replace the original app.
 | Feature | What it means for you |
 | --- | --- |
 | Local Wi-Fi connection | Steady quality and low latency without cables |
-| USB/ADB fallback | A backup option when no shared network is available |
+| USB/ADB connection | The same experience over cable: direct connection and auto-connect on plug-in, no shared network needed |
 | Pair once | A 6-digit code, then automatic connections |
 | Full control | From the phone, the terminal, or a local web page |
 | Arabic and English UI | With full right-to-left support |
 | No cloud | Audio stays inside your local network |
-| Open source | MIT licensed, with the code available to everyone |
+| Open source | GPLv3 licensed: free to use, and stays open source forever |
 
 ---
 
@@ -114,7 +114,7 @@ replace the original app.
 | Step | What happens |
 | --- | --- |
 | 1 | The phone captures audio from its microphone |
-| 2 | It streams the audio over Wi-Fi to the Sawt+ program on the computer |
+| 2 | It streams the audio over Wi-Fi or USB to the Sawt+ program on the computer |
 | 3 | The program receives it and exposes it as a PipeWire or PulseAudio source |
 | 4 | The source appears as `sawt-plus` in meeting and recording apps |
 | 5 | You control the input level from the phone, the terminal, or the web page |
@@ -122,7 +122,7 @@ replace the original app.
 ```text
 Phone microphone
       |
-      |  Wi-Fi (WebSocket) - PCM 48 kHz
+      |  Wi-Fi / USB (WebSocket) - PCM 48 kHz
       v
 Sawt+ daemon on Linux
       |
@@ -222,7 +222,7 @@ connection fails. If the problem persists, pair again from the app.
 <details>
 <summary><b>Is the project free?</b></summary>
 <br>
-Yes, it is open source under the MIT license.
+Yes, it is open source under the GPLv3 license — free and open for everyone, forever.
 </details>
 
 ---
@@ -251,7 +251,7 @@ Everything technical is documented in the **[advanced guide](docs/advanced.md)**
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+GPLv3. See [LICENSE](LICENSE).
 
 ---
 

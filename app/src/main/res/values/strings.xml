@@ -48,6 +48,14 @@
     <string name="settings_language">Language</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_device_name">Device name</string>
+    <string name="settings_paired_devices">Paired devices</string>
+    <string name="unpair_all">Unpair all</string>
+    <string name="unpair_all_title">Unpair all devices?</string>
+    <string name="unpair_all_done">All devices unpaired</string>
+    <string name="unpair_none">No paired devices</string>
+    <string name="settings_cert_fingerprint">Certificate fingerprint</string>
+    <string name="cert_fingerprint_title">TLS certificate fingerprint</string>
+    <string name="cert_fingerprint_message">The computer checks this fingerprint when connecting over Wi-Fi. Fingerprint:\n\n%s</string>
     <string name="device_name_hint">Name shown to the computer</string>
     <string name="device_name_saved">Device name saved</string>
     <string name="settings_change">Change</string>
@@ -80,5 +88,10 @@
     <plurals name="notification_clients">
         <item quantity="one">%d client</item>
         <item quantity="other">%d clients</item>
+    </plurals>
+
+    <plurals name="unpair_all_message">
+        <item quantity="one">This will disconnect %d paired device. It will need to pair again with a new code.</item>
+        <item quantity="other">This will disconnect %d paired devices. They will need to pair again with a new code.</item>
     </plurals>
 </resources>
