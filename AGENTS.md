@@ -22,6 +22,17 @@
 - If context is running low: stop feature work, write a complete handoff into
   `STATE.md`, and tell the user. Do not guess or redo finished work.
 
+## Phone UI testing (required)
+
+- The user drives all phone UI interaction: taps, Stop/Start, transport and
+  permission toggles, pairing, and settings changes. Never tap or automate the
+  phone UI (`input tap/swipe/keyevent`, uiautomator clicks, etc.).
+- When a test needs a UI action, ask the user to do it and wait for their
+  confirmation. Do not guess that the action happened.
+- Verify results from the host only: `adb logcat`, `dumpsys activity
+  services/activities`, the daemon API (`/api/status`, `/api/stream`), and the
+  CLI. A read-only UI dump is allowed for diagnosis, but never click it.
+
 ## Delegation (required)
 
 - Delegate broad read-only work to a subagent so the main context stays small:
@@ -40,7 +51,7 @@
 - Go client/daemon: `cmd/`, `internal/`
 - Android app: `app/src/main/java/com/sawtplus/app/`
 - App id: `com.sawtplus.app`
-- Ready artifacts: `apk/sawt-plus-2.0.2.apk` and `bin/sawt-linux-amd64`.
+- Ready artifacts: `apk/sawt-plus-2.1.2.apk` and `bin/sawt-linux-amd64`.
   Users install these; do not put Android build instructions in README.
 - Protocol: WebSocket text control + binary `s16le` 48000 Hz mono 20 ms.
 - Default transport: Wi-Fi (local network, `ws://`); ADB is the fallback.
